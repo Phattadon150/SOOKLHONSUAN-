@@ -1,4 +1,3 @@
-// src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Calculate from "./pages/Calculate";
@@ -19,5 +18,4 @@ function App() {
     </Router>
   );
 }
-
 export default App;
