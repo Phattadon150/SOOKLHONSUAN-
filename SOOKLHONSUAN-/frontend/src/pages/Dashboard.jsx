@@ -1,0 +1,54 @@
+import Header from "../components/Header";
+import Footer from "../components/Footer";
+import ProductCard from "../components/ProductCard";
+
+export default function Dashboard() {
+  // จำลองข้อมูลผลผลิต (ภายหลังจะมาจาก backend)
+  const data = [
+    { name: "มะนาว", area: 5, diff: -10 },
+    { name: "มะกรูด", area: 5, diff: -10 },
+    { name: "ลำไย", area: 5, diff: -10 },
+    { name: "พริก", area: 5, diff: -10 },
+  ];
+
+  const hasData = data.length > 0;
+
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <Header />
+
+      <main className="flex-1 p-4">
+        <h1 className="text-center text-xl font-bold text-green-800 mb-2">
+          ชื่อสวนของคุณ
+        </h1>
+        <p className="text-center text-gray-600 mb-4">แสดงภาพรวมของสวน</p>
+
+        {/* กราฟ mock */}
+        <div className="bg-white shadow-md rounded-xl p-6 mb-4">
+          <div className="h-48 flex items-center justify-center text-gray-400">
+            [กราฟแนวโน้มผลผลิต]
+          </div>
+        </div>
+
+        <h2 className="text-green-900 font-semibold mb-3">ผลผลิต</h2>
+
+        {hasData ? (
+          data.map((item, i) => (
+            <ProductCard
+              key={i}
+              name={item.name}
+              area={item.area}
+              diff={item.diff}
+            />
+          ))
+        ) : (
+          <div className="bg-white shadow rounded-xl p-6 text-center text-gray-500">
+            ยังไม่มีข้อมูลสวนของคุณ
+          </div>
+        )}
+      </main>
+
+      <Footer />
+    </div>
+  );
+}

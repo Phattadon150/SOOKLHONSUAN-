@@ -1,12 +1,22 @@
 import HamburgerMenu from "./HamburgerMenu";
+import logo from "/logosook.png";
 
 export default function Header() {
   return (
-    <header className="flex items-center justify-between p-4 bg-white shadow-sm">
-      <div className="text-xl font-semibold text-green-800">
-        สุขล้นสวน
+    <header className="flex items-center justify-between px-4 py-3 bg-white shadow-sm relative">
+      {/* Hamburger ซ้าย */}
+      <div className="absolute left-4">
+        <HamburgerMenu />
       </div>
-      <HamburgerMenu />
+
+      {/* โลโก้ตรงกลาง */}
+      <div className="flex-1 flex justify-center">
+        <img
+          src={logo}
+          alt="สุขล้นสวน"
+          className="h-10 w-auto object-contain"
+        />
+      </div>
     </header>
   );
 }

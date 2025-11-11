@@ -1,21 +1,12 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import Calculate from "./pages/Calculate";
-import Summary from "./pages/Summary";
-import History from "./pages/History";
-import ValueSummary from "./pages/ValueSummary";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Dashboard from "./pages/Dashboard";
 
-function App() {
+export default function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/calculate" element={<Calculate />} />
-        <Route path="/summary" element={<Summary />} />
-        <Route path="/history" element={<History />} />
-        <Route path="/value-summary" element={<ValueSummary />} />
+        <Route path="/" element={<Dashboard />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
-export default App;
