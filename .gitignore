@@ -2,9 +2,13 @@
 node_modules/
 
 # Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # Environment files
 .env
@@ -16,15 +20,19 @@ yarn-error.log*
 # Build output
 dist/
 build/
+dist-ssr/
+*.local
 
 # IDE / OS files
 .vscode/
 .idea/
 .DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Temporary files
-*.tmp
-*.log
-
-# Coverage / testing
+# Temporary / coverage
+tmp/
 coverage/
