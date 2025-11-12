@@ -34,8 +34,8 @@
 
 ## Team Roles
 
-| Name | Git Branch | Role | Responsibility |
-|------|-------------|------|----------------|
+| Name | Git Branch | Role |
+|------|-------------|------|
 | **Folk** | `feature/frontend-visualization`| Frontend Lead | 
 | **Porjai** | `feature/frontend-dashboard` |  Frontend Visualization | 
 | **Praew** | `feature/backend-api` | Backend Lead | 
