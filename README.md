@@ -36,10 +36,10 @@
 
 | Name | Git Branch | Role | Responsibility |
 |------|-------------|------|----------------|
-| **Folk** | `feature/frontend-visualization`| Frontend Lead | Dashboard Page, Input Form, Routing, UI |
-| **Porjai** | `feature/frontend-dashboard` | Product Owner / Frontend Visualization | Summary Page, History Page, Charts Integration |
-| **Praew** | `feature/backend-api` | Backend Lead | Database, Auth, CRUD, Calculation API |
-| **Google** | `feature/deployment` | Fullstack / DevOps | API Integration, Deployment (Vercel + Railway), QA & Docs |
+| **Folk** | `feature/frontend-visualization`| Frontend Lead | 
+| **Porjai** | `feature/frontend-dashboard` |  Frontend Visualization | 
+| **Praew** | `feature/backend-api` | Backend Lead | 
+| **Google** | `feature/deployment` | Fullstack / DevOps | 
 
 ---
 
