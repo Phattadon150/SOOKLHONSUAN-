@@ -3,21 +3,22 @@ import { useNavigate, Link } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-export default function Login() {
+export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-
-    if (username && password) {
-      // จำลอง login (จริงๆ จะมาจาก backend)
-      localStorage.setItem("username", username);
-      navigate("/farmform"); // ไปหน้ากรอกชื่อสวน
-    } else {
-      alert("กรุณากรอกชื่อผู้ใช้และรหัสผ่าน");
+    if (!username || !password) {
+      alert("กรุณากรอกข้อมูลให้ครบ");
+      return;
     }
+
+    // จำลองบันทึกลง localStorage
+    localStorage.setItem("username", username);
+    alert("สมัครสมาชิกสำเร็จ!");
+    navigate("/login");
   };
 
   return (
@@ -25,11 +26,11 @@ export default function Login() {
       <Header />
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         <form
-          onSubmit={handleLogin}
+          onSubmit={handleSubmit}
           className="bg-white shadow-md rounded-xl p-6 w-full max-w-sm space-y-4"
         >
           <h1 className="text-center text-green-800 font-bold text-lg">
-            เข้าสู่ระบบ
+            สมัครใช้งาน
           </h1>
           <input
             type="text"
@@ -45,15 +46,18 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
           />
-          <div className="text-right text-sm text-red-600">
-            <Link to="/register">สมัครใช้งาน</Link>
-          </div>
           <button
             type="submit"
             className="w-full bg-green-700 text-white py-2 rounded-full shadow hover:bg-green-800"
           >
-            ลงชื่อเข้าใช้
+            ลงทะเบียน
           </button>
+          <p className="text-center text-sm text-gray-600">
+            มีบัญชีแล้วใช่ไหม?{" "}
+            <Link to="/login" className="text-green-700 hover:underline">
+              เข้าสู่ระบบ
+            </Link>
+          </p>
         </form>
       </main>
       <Footer />
