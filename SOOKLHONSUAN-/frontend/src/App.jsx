@@ -7,7 +7,7 @@ import Summary from "./pages/Summary";
 import History from "./pages/History";
 import ValueSummary from "./pages/ValueSummary";
 import Calculate from "./pages/Calculate";
-import Landing from "./pages/Landing";
+//import Landing from "./pages/Landing";
 
 export default function App() {
   return (
@@ -20,7 +20,7 @@ export default function App() {
       <Route path="/history" element={<History />} />
       <Route path="/valuesummary" element={<ValueSummary />} />
       <Route path="/calculate" element={<Calculate />} />
-      <Route path="/landing" element={<Landing />} />
+     
     </Routes>
   );
 }
