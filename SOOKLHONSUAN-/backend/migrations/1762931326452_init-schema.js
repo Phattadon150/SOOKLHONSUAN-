@@ -9,10 +9,11 @@ export const shorthands = undefined;
 export const up = (pgm) => {
   pgm.createTable('users', {
     id: 'id',
-    name: { type: 'varchar(100)', notNull: true },
+    firstname: { type: 'varchar(100)', notNull: true },
+    lastname: { type: 'varchar(100)', notNull: true },
     email: { type: 'varchar(100)', unique: true, notNull: true },
     password: { type: 'varchar(200)', notNull: true },
-    plan_type: { type: 'varchar(20)' },
+    plan_type: { type: 'varchar(20)', default: 'free' },
     created_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
   });
 
