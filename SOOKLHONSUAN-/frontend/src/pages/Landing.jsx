@@ -38,9 +38,6 @@ export default function Landing() {
 
       {/* ✅ ส่วนฟีเจอร์ */}
       <section className="bg-white py-12 px-6">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-green-800 mb-8">
-          ฟีเจอร์เด่นของเรา
-        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {[
             "คำนวณผลผลิตจากจำนวนต้น",

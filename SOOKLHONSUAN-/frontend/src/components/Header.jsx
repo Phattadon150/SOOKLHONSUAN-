@@ -55,7 +55,7 @@ export default function Header() {
 
         {/* เมนูขวา */}
         <nav className="flex items-center gap-6 text-green-800 font-medium">
-          <Link to="/">ภาพรวม</Link>
+          <Link to="/dashboard">ภาพรวม</Link>
           <Link to="/summary">สรุปผล</Link>
           <Link to="/history">ประวัติ</Link>
           <Link to="/valuesummary">มูลค่าสวน</Link>
