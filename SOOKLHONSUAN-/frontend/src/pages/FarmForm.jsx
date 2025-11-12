@@ -22,7 +22,7 @@ export default function FarmForm() {
     localStorage.setItem("farmData", JSON.stringify(farmData));
 
     // ส่งไปหน้า Dashboard
-    navigate("/");
+    navigate("/dashboard");
   };
 
   return (
