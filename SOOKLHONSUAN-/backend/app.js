@@ -18,9 +18,12 @@ const authRoutes = require('./src/routes/auth');
 const farmRoutes = require('./src/routes/farm');
 const cropTypeRoutes = require('./src/routes/cropTypes');
 const userRoutes = require('./src/routes/user');
+const calculationRoutes = require('./src/routes/calculations');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/farms', farmRoutes);
 app.use('/api/crop-types', cropTypeRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/calculations', calculationRoutes);
+
 module.exports = app;
