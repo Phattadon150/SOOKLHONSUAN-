@@ -15,5 +15,6 @@ router.post('/preview', requireAuth, calc.previewCalculation);
 
 // Create: คำนวณ (ถ้ายังไม่ส่งค่า) + บันทึกลงตาราง calculations
 router.post('/', requireAuth, calc.createCalculation);
+router.get('/', requireAuth, calc.listCalculations);
 
 module.exports = router;

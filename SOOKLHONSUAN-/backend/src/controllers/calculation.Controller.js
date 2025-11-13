@@ -283,4 +283,62 @@ const createCalculation = async (req, res) => {
   }
 };
 
-module.exports = { previewCalculation, createCalculation };
+const listCalculations = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { farm_id, limit = 20, offset = 0 } = req.query;
+
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+    const params = [userId];
+    let where = 'WHERE f.user_id = $1';
+
+    if (farm_id) {
+      params.push(farm_id);
+      where += ` AND c.farm_id = $${params.length}`;
+    }
+
+    params.push(safeLimit, safeOffset);
+
+    const { rows } = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.farm_id,
+        f.name AS farm_name,
+        c.crop_type_id,
+        ct.name AS crop_type_name,
+        c.calc_date,
+        c.location,
+        c.area_rai,
+        c.estimated_yield,
+        c.actual_yield,
+        c.condition,
+        c.created_at
+      FROM calculations c
+      JOIN farms f ON c.farm_id = f.id
+      LEFT JOIN crop_types ct ON c.crop_type_id = ct.id
+      ${where}
+      ORDER BY c.created_at DESC
+      LIMIT $${params.length - 1}
+      OFFSET $${params.length}
+      `,
+      params
+    );
+
+    return res.json({
+      items: rows,
+      pagination: {
+        limit: safeLimit,
+        offset: safeOffset,
+        count: rows.length
+      }
+    });
+  } catch (e) {
+    console.error('listCalculations error:', e);
+    res.status(500).json({ error: e.message });
+  }
+};
+
+module.exports = { previewCalculation, createCalculation, listCalculations };
