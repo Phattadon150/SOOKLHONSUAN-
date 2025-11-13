@@ -1,15 +1,20 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+require('dotenv').config();
+const app = require('./app'); 
+const pool = require('./src/db'); 
+const PORT = process.env.PORT || 4000;
 
-dotenv.config();
-const app = express();
+async function startServer() {
+  try {
+    const client = await pool.connect();
+    console.log(" Database connected successfully! :)");
+    client.release(); 
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
 
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.json({ message: "SookLhonSuan Backend Running 🌱" });
-});
-
-app.listen(4000, () => console.log("Server running on port 4000"));
+  } catch (error) {
+    console.error("Failed to connect to database T^T:", error.message);
+    process.exit(1);
+  }
+}
+startServer();
