@@ -4,34 +4,31 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 export default function FarmForm() {
+  const navigate = useNavigate();
   const [farmName, setFarmName] = useState("");
   const [selectedCrop, setSelectedCrop] = useState("");
-  const navigate = useNavigate();
 
-  // ✅ ตัวอย่างพืชให้เลือก (จะใช้จริงจาก backend ภายหลังได้)
-  const cropOptions = [
-    "ลำไย",
-    "มะนาว",
-    "มะกรูด",
-    "พริก",
-    "มะม่วง",
-    "ข้าวโพด",
-    "ทุเรียน",
-  ];
+  const user = localStorage.getItem("currentUser");
+  const cropOptions = ["ลำไย", "มะนาว", "มะกรูด", "พริก", "มะม่วง"];
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    if (!farmName) {
-      alert("กรุณากรอกชื่อสวน");
+    if (!farmName || !selectedCrop) {
+      alert("กรุณากรอกชื่อสวนและเลือกพืช");
       return;
     }
 
-    // ✅ เก็บข้อมูลสวน
-    const farmData = { farmName, crop: selectedCrop };
-    localStorage.setItem("farmData", JSON.stringify(farmData));
+    const farmData = {
+      user,
+      farmName,
+      crop: selectedCrop,
+    };
 
-    // ✅ ส่งไปหน้า Dashboard
+    // ✅ เก็บข้อมูลสวนของผู้ใช้
+    localStorage.setItem(`farmData_${user}`, JSON.stringify(farmData));
+    console.log("✅ farmData saved:", farmData);
+
+    // ✅ ไปหน้า Dashboard หลังบันทึก
     navigate("/dashboard");
   };
 
@@ -48,7 +45,6 @@ export default function FarmForm() {
             กรอกชื่อสวน
           </h1>
 
-          {/* ชื่อสวน */}
           <input
             type="text"
             placeholder="ชื่อสวน"
@@ -57,14 +53,14 @@ export default function FarmForm() {
             className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
           />
 
-          {/* Dropdown เลือกพืช */}
           <h2 className="text-center font-semibold text-gray-600 mt-4">
             เลือกพืชที่ปลูก
           </h2>
+
           <select
             value={selectedCrop}
             onChange={(e) => setSelectedCrop(e.target.value)}
-            className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+            className="w-full border border-gray-300 rounded-full px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
           >
             <option value="">-- เลือกพืช --</option>
             {cropOptions.map((crop, index) => (
@@ -74,7 +70,6 @@ export default function FarmForm() {
             ))}
           </select>
 
-          {/* ปุ่มบันทึก */}
           <button
             type="submit"
             className="w-full bg-green-700 text-white py-2 rounded-full shadow hover:bg-green-800"

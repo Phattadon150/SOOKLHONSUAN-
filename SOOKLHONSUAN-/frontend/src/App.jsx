@@ -8,14 +8,12 @@ import Summary from "./pages/Summary";
 import History from "./pages/History";
 import ValueSummary from "./pages/ValueSummary";
 import Calculate from "./pages/Calculate";
+import ProductDetail from "./pages/ProductDetail"; // 
 
 export default function App() {
   return (
     <Routes>
-      {/* ✅ หน้าแรก (Landing Page) */}
       <Route path="/" element={<Landing />} />
-
-      {/* ✅ หน้าหลัก */}
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -24,9 +22,8 @@ export default function App() {
       <Route path="/history" element={<History />} />
       <Route path="/valuesummary" element={<ValueSummary />} />
       <Route path="/calculate" element={<Calculate />} />
-
-      {/* ✅ fallback ถ้า route ไม่เจอ → กลับหน้า Landing */}
       <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/product/:crop" element={<ProductDetail />} />
     </Routes>
   );
 }

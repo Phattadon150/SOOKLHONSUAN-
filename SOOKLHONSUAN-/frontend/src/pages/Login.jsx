@@ -10,13 +10,18 @@ export default function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
+    const users = JSON.parse(localStorage.getItem("users")) || [];
+    const user = users.find(
+      (u) => u.username === username && u.password === password
+    );
 
-    if (username && password) {
-      // จำลอง login (จริงๆ จะมาจาก backend)
-      localStorage.setItem("username", username);
-      navigate("/farmform"); // ไปหน้ากรอกชื่อสวน
+    if (user) {
+      localStorage.setItem("currentUser", username);
+      localStorage.setItem("currentUserFullname", `${user.firstName} ${user.lastName}`);
+      alert(`ยินดีต้อนรับ ${user.firstName} ${user.lastName}`);
+      navigate("/farmform");
     } else {
-      alert("กรุณากรอกชื่อผู้ใช้และรหัสผ่าน");
+      alert("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
     }
   };
 
@@ -26,34 +31,42 @@ export default function Login() {
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         <form
           onSubmit={handleLogin}
-          className="bg-white shadow-md rounded-xl p-6 w-full max-w-sm space-y-4"
+          className="bg-white shadow-md rounded-xl p-6 w-full max-w-md space-y-4"
         >
           <h1 className="text-center text-green-800 font-bold text-lg">
             เข้าสู่ระบบ
           </h1>
+
           <input
             type="text"
-            placeholder="ชื่อบัญชีผู้ใช้"
+            placeholder="ชื่อผู้ใช้"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
+            className="w-full border border-gray-300 rounded-full px-4 py-2"
           />
           <input
             type="password"
             placeholder="รหัสผ่าน"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
+            className="w-full border border-gray-300 rounded-full px-4 py-2"
           />
-          <div className="text-right text-sm text-red-600">
-            <Link to="/register">สมัครใช้งาน</Link>
-          </div>
+
           <button
             type="submit"
-            className="w-full bg-green-700 text-white py-2 rounded-full shadow hover:bg-green-800"
+            className="w-full bg-green-700 text-white py-2 rounded-full hover:bg-green-800 transition"
           >
-            ลงชื่อเข้าใช้
+            เข้าสู่ระบบ
           </button>
+
+          <div className="flex justify-between text-sm text-gray-600 mt-3">
+            <Link to="/register" className="text-green-700 hover:underline">
+              สมัครเข้าใช้งาน
+            </Link>
+            <Link to="/forgot-password" className="text-green-700 hover:underline">
+              ลืมรหัสผ่าน?
+            </Link>
+          </div>
         </form>
       </main>
       <Footer />

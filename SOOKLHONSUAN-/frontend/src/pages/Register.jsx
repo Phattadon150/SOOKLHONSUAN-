@@ -4,19 +4,39 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  const [form, setForm] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    username: "",
+    password: "",
+  });
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!username || !password) {
-      alert("กรุณากรอกข้อมูลให้ครบ");
+    const { email, firstName, lastName, username, password } = form;
+
+    if (!email || !firstName || !lastName || !username || !password) {
+      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return;
     }
 
-    // จำลองบันทึกลง localStorage
-    localStorage.setItem("username", username);
+    const users = JSON.parse(localStorage.getItem("users")) || [];
+    if (users.find((u) => u.username === username)) {
+      alert("ชื่อผู้ใช้นี้ถูกใช้แล้ว");
+      return;
+    }
+
+    const newUser = { email, firstName, lastName, username, password };
+    users.push(newUser);
+    localStorage.setItem("users", JSON.stringify(users));
+
     alert("สมัครสมาชิกสำเร็จ!");
     navigate("/login");
   };
@@ -27,34 +47,65 @@ export default function Register() {
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         <form
           onSubmit={handleSubmit}
-          className="bg-white shadow-md rounded-xl p-6 w-full max-w-sm space-y-4"
+          className="bg-white shadow-md rounded-xl p-6 w-full max-w-md space-y-4"
         >
           <h1 className="text-center text-green-800 font-bold text-lg">
-            สมัครใช้งาน
+            สมัครสมาชิก
           </h1>
+
           <input
-            type="text"
-            placeholder="ชื่อบัญชีผู้ใช้"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
+            name="email"
+            type="email"
+            placeholder="อีเมล"
+            value={form.email}
+            onChange={handleChange}
+            className="w-full border border-gray-300 rounded-full px-4 py-2"
           />
+
+          <div className="flex space-x-2">
+            <input
+              name="firstName"
+              placeholder="ชื่อจริง"
+              value={form.firstName}
+              onChange={handleChange}
+              className="w-1/2 border border-gray-300 rounded-full px-4 py-2"
+            />
+            <input
+              name="lastName"
+              placeholder="นามสกุล"
+              value={form.lastName}
+              onChange={handleChange}
+              className="w-1/2 border border-gray-300 rounded-full px-4 py-2"
+            />
+          </div>
+
           <input
+            name="username"
+            placeholder="ชื่อผู้ใช้"
+            value={form.username}
+            onChange={handleChange}
+            className="w-full border border-gray-300 rounded-full px-4 py-2"
+          />
+
+          <input
+            name="password"
             type="password"
             placeholder="รหัสผ่าน"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
+            value={form.password}
+            onChange={handleChange}
+            className="w-full border border-gray-300 rounded-full px-4 py-2"
           />
+
           <button
             type="submit"
-            className="w-full bg-green-700 text-white py-2 rounded-full shadow hover:bg-green-800"
+            className="w-full bg-green-700 text-white py-2 rounded-full hover:bg-green-800 transition"
           >
-            ลงทะเบียน
+            สมัครเข้าใช้งาน
           </button>
-          <p className="text-center text-sm text-gray-600">
-            มีบัญชีแล้วใช่ไหม?{" "}
-            <Link to="/login" className="text-green-700 hover:underline">
+
+          <p className="text-center text-sm text-gray-500 mt-2">
+            มีบัญชีอยู่แล้ว?{" "}
+            <Link to="/login" className="text-green-700 font-semibold">
               เข้าสู่ระบบ
             </Link>
           </p>
