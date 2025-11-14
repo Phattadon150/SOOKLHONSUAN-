@@ -1,7 +1,10 @@
-import { useState } from "react";
+// Register.jsx (ฉบับแก้ไข)
+
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import Header from "../components/Header";
+import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import Modal from "../components/Modal"; // ⭐️ 1. Import Modal
 
 export default function Register() {
   const navigate = useNavigate();
@@ -14,45 +17,57 @@ export default function Register() {
     password: "",
   });
 
+  // ⭐️ 2. (ใหม่) State สำหรับ Modal และ Animation
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
+  const [isVisible, setIsVisible] = useState(false);
+
+  // (Effect สำหรับ Animation)
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  // ⭐️ 3. (ใหม่) ฟังก์ชันสำหรับปิด Modal
+  const handleCloseModal = () => {
+    // ถ้า Modal ที่ปิดเป็น 'success' (สมัครสำเร็จ)
+    if (modal.type === 'success') {
+      navigate("/login"); // 👈 ไปหน้า Login
+    }
+    setModal({ isOpen: false, title: '', message: '', type: 'info' });
+  };
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // --- 🌟 นี่คือฟังก์ชันที่อัปเกรดแล้ว 🌟 ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { email, firstName, lastName, username, password } = form;
 
     if (!email || !firstName || !lastName || !username || !password) {
-      alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      // ⭐️ (แก้ไข) 4. เปลี่ยน alert เป็น Modal
+      setModal({
+        isOpen: true,
+        title: "ข้อมูลไม่ครบ",
+        message: "กรุณากรอกข้อมูลให้ครบทุกช่อง",
+        type: 'error'
+      });
       return;
     }
 
-    // Backend จะตรวจสอบการซ้ำซ้อนให้เอง
-    // const users = JSON.parse(localStorage.getItem("users")) || [];
-    // if (users.find((u) => u.username === username)) {
-    //   alert("ชื่อผู้ใช้นี้ถูกใช้แล้ว");
-    //   return;
-    // }
-
     try {
-      // สร้าง Payload ที่ตรงกับที่ Backend ต้องการ
       const payload = {
-        firstname: firstName, // สังเกต: แปลง firstName -> firstname
-        lastname: lastName,   // สังเกต: แปลง lastName -> lastname
+        firstname: firstName,
+        lastname: lastName,
         email: email,
         username: username,
         password: password,
       };
 
-      // สมมติว่า Backend รันอยู่ที่ http://localhost:4000
       const response = await fetch(
         "http://localhost:4000/api/auth/register",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
@@ -60,28 +75,56 @@ export default function Register() {
       const data = await response.json();
 
       if (!response.ok) {
-        // ถ้า Backend ส่ง Error กลับมา (เช่น { error: "Email already exists" })
-        alert(data.error || "สมัครสมาชิกไม่สำเร็จ");
+        // ⭐️ (แก้ไข) 5. เปลี่ยน alert เป็น Modal
+        setModal({
+          isOpen: true,
+          title: "สมัครไม่สำเร็จ",
+          message: data.error || "เกิดข้อผิดพลาดในการสมัคร",
+          type: 'error'
+        });
         return;
       }
 
-      // ถ้าสำเร็จ (Backend ตอบ 201 Created)
-      alert("สมัครสมาชิกสำเร็จ!");
-      navigate("/login"); // ไปหน้า Login หลังสมัครเสร็จ
+      // ⭐️ (แก้ไข) 6. เปลี่ยน alert เป็น Modal
+      setModal({
+        isOpen: true,
+        title: "สมัครสมาชิกสำเร็จ!",
+        message: "คุณสามารถเข้าสู่ระบบได้เลย",
+        type: 'success'
+      });
+      // (จะ navigate ไปหน้า login ตอนกดปิด)
 
     } catch (error) {
       console.error("Register error:", error);
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + error.message);
+      // ⭐️ (แก้ไข) 7. เปลี่ยน alert เป็น Modal
+      setModal({
+        isOpen: true,
+        title: "เกิดข้อผิดพลาด",
+        message: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: " + error.message,
+        type: 'error'
+      });
     }
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header />
+      <Navbar />
+
+      {/* ⭐️ 8. (ใหม่) แสดง Modal */}
+      <Modal 
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        onClose={handleCloseModal}
+      />
+      
       <main className="flex-1 flex flex-col items-center justify-center px-4">
+        {/* ⭐️ 9. (แก้ไข) เพิ่ม Animation ให้ฟอร์ม */}
         <form
           onSubmit={handleSubmit}
-          className="bg-white shadow-md rounded-xl p-6 w-full max-w-md space-y-4"
+          className={`bg-white shadow-md rounded-xl p-6 w-full max-w-md space-y-4 transition-all duration-700 ease-out ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
         >
           <h1 className="text-center text-green-800 font-bold text-lg">
             สมัครสมาชิก
@@ -98,14 +141,14 @@ export default function Register() {
 
           <div className="flex space-x-2">
             <input
-              name="firstName" // React state ใช้ 'firstName'
+              name="firstName"
               placeholder="ชื่อจริง"
               value={form.firstName}
               onChange={handleChange}
               className="w-1/2 border border-gray-300 rounded-full px-4 py-2"
             />
             <input
-              name="lastName" // React state ใช้ 'lastName'
+              name="lastName"
               placeholder="นามสกุล"
               value={form.lastName}
               onChange={handleChange}

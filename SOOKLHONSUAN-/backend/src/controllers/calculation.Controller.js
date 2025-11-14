@@ -1,3 +1,5 @@
+// controllers/calculation.Controller.js
+
 const pool = require('../db');
 const { getProvinceAvgYield } = require('../utils/provinceAvg');
 const { getProvinceMonthlyPattern } = require('../utils/monthlyPattern');
@@ -111,13 +113,16 @@ async function computeFromProvince({
 
 // ===== PREVIEW: คำนวณอย่างเดียว ไม่บันทึก =====
 const previewCalculation = async (req, res) => {
-  // ( ... โค้ดเดิม ... )
   console.log('--- [CalcController: previewCalculation] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 1. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
     const body = req.body || {};
-    console.log(`[Calc: preview] UserID: ${userId}, Body:`, body);
+    // ⭐️ (แก้ไข) 1.1 แก้ไข Syntax Error
     const { farm_id, crop_type_id, location } = body;
+    console.log(`[Calc: preview] UserID: ${userId}, Body:`, body);
+
+    // ⭐️ (แก้ไข) 1.2 แก้ไข Syntax Error
     if (!farm_id || !crop_type_id || !location) {
       console.warn('[Calc: preview] Validation Failed: ข้อมูลไม่ครบ');
       return res.status(400).json({ error: 'farm_id, crop_type_id และ location (จังหวัด) จำเป็น' });
@@ -132,7 +137,7 @@ const previewCalculation = async (req, res) => {
     let resultPayload = {};
     if (est == null) {
       console.log('[Calc: preview] estimated_yield = null, เริ่มคำนวณ...');
-      const r = await computeFromProvince({ ...body, province: location }); // ⭐️ แก้ไข: ส่ง province
+      const r = await computeFromProvince({ ...body, province: location });
       if (!r) {
         console.warn(`[Calc: preview] Error: ไม่มีข้อมูลผลผลิตเฉลี่ยของจังหวัด "${location}"`);
         return res.status(404).json({ error: `No average yield for province "${location}"` });
@@ -171,16 +176,19 @@ const previewCalculation = async (req, res) => {
 
 // ===== CREATE: บันทึกจริง =====
 const createCalculation = async (req, res) => {
-  // ( ... โค้ดเดิม ... )
   console.log('--- [CalcController: createCalculation] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 2. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
+    // ⭐️ (แก้ไข) 2.1 แก้ไข Syntax Error
     const {
       farm_id, crop_type_id, location, area_rai,
       tree_age_avg, quality, harvest_month,
       calc_date, estimated_yield, actual_yield
     } = req.body || {};
     console.log(`[Calc: create] UserID: ${userId}, Body:`, req.body);
+
+    // ⭐️ (แก้ไข) 2.2 แก้ไข Syntax Error
     if (!farm_id || !crop_type_id || !location) {
       console.warn('[Calc: create] Validation Failed: ข้อมูลไม่ครบ');
       return res.status(400).json({ error: 'farm_id, crop_type_id และ location (จังหวัด) จำเป็น' });
@@ -229,11 +237,12 @@ const createCalculation = async (req, res) => {
   }
 };
 
-// ⭐️ ===== GET ALL: ดึงผลการคำนวณทั้งหมดของ User (เพิ่มใหม่) =====
+// ⭐️ ===== GET ALL: ดึงผลการคำนวณทั้งหมดของ User (สำหรับ Dashboard/History) =====
 const getCalculationsByUser = async (req, res) => {
   console.log('--- [CalcController: getCalculationsByUser] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 3. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
     console.log(`[Calc: getAll] กำลังดึง Calculations ทั้งหมดของ User ID: ${userId}`);
 
     const { rows } = await pool.query(
@@ -260,10 +269,105 @@ const getCalculationsByUser = async (req, res) => {
   }
 };
 
+// ===== DELETE: ลบรายการ =====
+const deleteCalculation = async (req, res) => {
+  console.log('--- [CalcController: deleteCalculation] เริ่มต้น ---');
+  try {
+    // ⭐️ (แก้ไข) 4. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
+    const { id } = req.params;
+    console.log(`[Calc: delete] UserID: ${userId}, CalcID: ${id}`);
 
-// ⭐️ ===== อัปเดต module.exports =====
+    const calcId = parseInt(id, 10);
+    if (isNaN(calcId) || calcId <= 0) {
+      return res.status(400).json({ error: 'Invalid Calculation ID format' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM calculations c
+       USING farms f
+       WHERE c.farm_id = f.id
+         AND c.id = $1
+         AND f.user_id = $2`,
+      [calcId, userId]
+    );
+    
+    if (result.rowCount === 0) {
+      console.warn(`[Calc: delete] Error: ไม่พบ Calc ID: ${calcId} ของ User: ${userId}`);
+      return res.status(404).json({ error: 'Calculation not found or not yours' });
+    }
+
+    console.log(`[Calc: delete] ลบ Calculation ID: ${calcId} สำเร็จ`);
+    res.json({ message: 'Calculation deleted successfully' });
+
+  } catch (err) {
+    console.error('--- [CalcController: deleteCalculation] เกิดข้อผิดพลาด ---');
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ===== UPDATE: อัปเดตรายการ (บันทึกผลจริง) =====
+const updateCalculation = async (req, res) => {
+  console.log('--- [CalcController: updateCalculation] เริ่มต้น ---');
+  try {
+    // ⭐️ (แก้ไข) 5. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { actual_yield, calc_date } = req.body; 
+
+    console.log(`[Calc: update] UserID: ${userId}, CalcID: ${id}, Body:`, req.body);
+
+    const calcId = parseInt(id, 10);
+    if (isNaN(calcId) || calcId <= 0) {
+      return res.status(400).json({ error: 'Invalid Calculation ID format' });
+    }
+
+    const safeActualYield = Number(actual_yield);
+    if (actual_yield == null || !Number.isFinite(safeActualYield) || safeActualYield < 0) {
+      return res.status(400).json({ error: 'actual_yield (ผลผลิตจริง) is required and must be a number' });
+    }
+    
+    const safeCalcDate = calc_date ? new Date(calc_date) : new Date();
+    if (isNaN(safeCalcDate.getTime())) {
+       return res.status(400).json({ error: 'Invalid calc_date format' });
+    }
+
+    console.log(`[Calc: update] Updating CalcID: ${calcId} with Actual: ${safeActualYield}, Date: ${safeCalcDate.toISOString()}`);
+
+    const { rows } = await pool.query(
+      `UPDATE calculations c
+       SET 
+         actual_yield = $1,
+         calc_date = $2 
+       FROM farms f
+       WHERE c.id = $3
+         AND c.farm_id = f.id
+         AND f.user_id = $4
+       RETURNING c.id, c.farm_id, c.location, c.estimated_yield, c.actual_yield, c.calc_date`,
+      [safeActualYield, safeCalcDate, calcId, userId]
+    );
+
+    if (rows.length === 0) {
+      console.warn(`[Calc: update] Error: ไม่พบ Calc ID: ${calcId} ของ User: ${userId}`);
+      return res.status(404).json({ error: 'Calculation not found or not yours' });
+    }
+
+    console.log('[Calc: update] อัปเดตสำเร็จ:', rows[0]);
+    res.json(rows[0]);
+
+  } catch (err) {
+    console.error('--- [CalcController: updateCalculation] เกิดข้อผิดพลาด ---');
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ⭐️ (แก้ไข) 6. แก้ไข module.exports (โค้ดเดิมของคุณถูกต้องแล้ว)
 module.exports = { 
   previewCalculation, 
   createCalculation,
-  getCalculationsByUser // 👈 เพิ่มฟังก์ชันใหม่
+  getCalculationsByUser,
+  deleteCalculation,
+  updateCalculation,
 };

@@ -1,3 +1,5 @@
+// authController.js (ฉบับแก้ไข)
+
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -100,7 +102,11 @@ const login = async (req, res) => {
     }
 
     console.log('[Auth: login] กำลังสร้าง Token...');
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    
+    // ⭐️⭐️⭐️⭐️⭐️ 1. แก้ไขจุดนี้ ⭐️⭐️⭐️⭐️⭐️
+    // เปลี่ยน Key จาก { userId: user.id } เป็น { id: user.id }
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    // ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️
 
     const userResponse = {
       id: user.id,
@@ -124,7 +130,12 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   console.log('--- [AuthController: getMe] เริ่มต้น ---');
   try {
-    const userId = req.user.userId; // 👈 ได้มาจาก authMiddleware
+
+    // ⭐️⭐️⭐️⭐️⭐️ 2. แก้ไขจุดนี้ ⭐️⭐️⭐️⭐️⭐️
+    // เปลี่ยน Key ที่ใช้ดึงจาก req.user.userId เป็น req.user.id
+    const userId = req.user.id; // 👈 ได้มาจาก authMiddleware
+    // ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️
+
     console.log(`[Auth: getMe] กำลังดึงข้อมูล User ID: ${userId}`);
 
     const { rows } = await pool.query(

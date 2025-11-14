@@ -1,10 +1,13 @@
+// controllers/farmController.js
+
 const pool = require('../db');
 
 // --- 1. สร้างฟาร์ม ---
 const createFarm = async (req, res) => {
   console.log('--- [FarmController: createFarm] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 1. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
     const { name, crop_type_id } = req.body;
     console.log(`[Farm: create] UserID: ${userId}, Body:`, req.body);
 
@@ -42,7 +45,8 @@ const createFarm = async (req, res) => {
 const getFarms = async (req, res) => {
   console.log('--- [FarmController: getFarms] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 2. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
     console.log(`[Farm: getFarms] กำลังดึงฟาร์มทั้งหมดของ User ID: ${userId}`);
 
     const { rows } = await pool.query(
@@ -69,7 +73,8 @@ const getFarms = async (req, res) => {
 const getFarmById = async (req, res) => {
   console.log('--- [FarmController: getFarmById] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 3. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
     const { id } = req.params;
     console.log(`[Farm: getById] UserID: ${userId}, FarmID (จาก URL): ${id}`);
 
@@ -107,7 +112,8 @@ const getFarmById = async (req, res) => {
 const updateFarm = async (req, res) => {
   console.log('--- [FarmController: updateFarm] เริ่มต้น ---');
   try {
-    const userId = req.user.userId;
+    // ⭐️ (แก้ไข) 4. เปลี่ยนจาก .userId เป็น .id
+    const userId = req.user.id;
     const { id } = req.params;
     const { name, crop_type_id } = req.body;
     console.log(`[Farm: update] UserID: ${userId}, FarmID: ${id}, Body:`, req.body);
@@ -143,8 +149,9 @@ const updateFarm = async (req, res) => {
 // --- 5. ลบฟาร์ม ---
 const deleteFarm = async (req, res) => {
   console.log('--- [FarmController: deleteFarm] เริ่มต้น ---');
+  const client = await pool.connect(); // ⭐️ 1. เปิด Transaction
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { id } = req.params;
     console.log(`[Farm: delete] UserID: ${userId}, FarmID: ${id}`);
 
@@ -152,35 +159,56 @@ const deleteFarm = async (req, res) => {
     if (isNaN(farmId) || farmId <= 0) {
       return res.status(400).json({ error: 'Invalid Farm ID format' });
     }
+    
+    // เริ่มต้น Transaction เพื่อให้แน่ใจว่าทั้ง 2 คำสั่งสำเร็จพร้อมกัน
+    await client.query('BEGIN'); 
 
-    const result = await pool.query(
+    // ⭐️ 2. ลบข้อมูลการคำนวณที่เกี่ยวข้องก่อน
+    console.log(`[Farm: delete] กำลังลบประวัติการคำนวณทั้งหมดของ Farm ID: ${farmId}`);
+    // เราไม่จำเป็นต้องตรวจสอบ user_id ที่นี่ เพราะ calculations เชื่อมโยงกับ farm_id อยู่แล้ว
+    await client.query(
+      'DELETE FROM calculations WHERE farm_id = $1',
+      [farmId]
+    );
+    console.log(`[Farm: delete] ลบประวัติการคำนวณเรียบร้อย`);
+
+    // ⭐️ 3. ลบข้อมูลฟาร์ม (ตารางหลัก)
+    console.log(`[Farm: delete] กำลังลบ Farm ID: ${farmId}`);
+    const result = await client.query(
       'DELETE FROM farms WHERE id = $1 AND user_id = $2',
       [farmId, userId]
     );
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK'); // Rollback ถ้าไม่พบฟาร์ม
       return res.status(404).json({ error: 'Farm not found or not yours' });
     }
 
+    await client.query('COMMIT'); // ⭐️ 4. ยืนยัน Transaction (สำเร็จ)
+    
     console.log(`[Farm: delete] ลบ Farm ID: ${farmId} สำเร็จ`);
-    res.json({ message: 'Farm deleted successfully' });
+    res.json({ message: 'Farm and related calculations deleted successfully' });
 
   } catch (err) {
+    // ⭐️ 5. Rollback หากมีข้อผิดพลาดใดๆ เกิดขึ้น
+    await client.query('ROLLBACK');
     console.error('--- [FarmController: deleteFarm] เกิดข้อผิดพลาด ---');
     console.error(err);
-    res.status(500).json({ error: err.message });
+    // ตรวจสอบข้อผิดพลาดเฉพาะเจาะจง (ถ้ามี)
+    res.status(500).json({ error: 'Failed to delete farm due to a database error.' });
+  } finally {
+    // ⭐️ 6. คืน Client ให้ Pool
+    client.release();
+    console.log('--- [FarmController: deleteFarm] สิ้นสุด ---');
   }
 };
 
 
-// ⭐️ --- START: นี่คือจุดที่ Error Log ฟ้อง ⭐️ ---
-// (ที่บรรทัด 84 ใน Error Log)
-
+// ⭐️ (แก้ไข) 6. แก้ไข module.exports ให้ครบ (โค้ดเดิมของคุณถูกต้องแล้ว)
 module.exports = {
   createFarm,
-  getFarms,     // ✅ ต้องเป็น F พิมพ์ใหญ่ (ตรงกับชื่อฟังก์ชัน)
+  getFarms,
   getFarmById,
-  updateFarm,   // ✅ เพิ่ม 2 บรรทัดนี้
-  deleteFarm    // ✅ (เพราะ farm.js เรียกใช้)
+  updateFarm,
+  deleteFarm
 };
-// ⭐️ --- END --- ⭐️

@@ -1,259 +1,319 @@
+// Dashboard.jsx (ฉบับแก้ไข - กราฟรวมตามชนิดพืช)
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
+import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import ProductCard from "../components/ProductCard";
+import FarmCard from "../components/FarmCard"; 
+import Modal from "../components/Modal"; 
+import ConfirmModal from "../components/ConfirmModal"; 
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  Cell // ⭐️ 1. (แก้ไข) Import "Cell" เพิ่ม
 } from "recharts";
-
-// --- 1. เพิ่ม State สำหรับเก็บชื่อพืชผล (สำหรับสร้างแท่งกราฟ) ---
-const [cropNames, setCropNames] = useState([]);
-
-// --- 2. เพิ่มฟังก์ชันสำหรับกำหนดสี (เพื่อให้แต่ละพืชมีสีต่างกัน) ---
-const COLORS = ["#10b981", "#ef4444", "#3b82f6", "#f97316", "#8b5cf6", "#ec4899"];
-const getColor = (index) => COLORS[index % COLORS.length];
-
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  const [calculations, setCalculations] = useState([]);
+  // ( ... State ทั้งหมด ... เหมือนเดิม )
+  const [allCalculations, setAllCalculations] = useState([]); 
+  const [allFarms, setAllFarms] = useState([]);
+  const [displayedFarms, setDisplayedFarms] = useState([]); 
+  const [searchTerm, setSearchTerm] = useState("");
   const [graphData, setGraphData] = useState([]);
-  
-  // --- 1. (เพิ่ม) State สำหรับเก็บชื่อพืชผล ---
-  const [cropNames, setCropNames] = useState([]);
-
+  // const [cropNames, setCropNames] = useState([]); // (ไม่จำเป็นต้องใช้แล้ว)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', isError: false });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', farmId: null });
 
-  // --- 2. (เพิ่ม) ฟังก์ชันสี ---
   const COLORS = ["#10b981", "#ef4444", "#3b82f6", "#f97316", "#8b5cf6", "#ec4899"];
   const getColor = (index) => COLORS[index % COLORS.length];
 
   useEffect(() => {
-    const fetchCalculations = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
+    const timer = setTimeout(() => setIsVisible(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    
+    const fetchDashboardData = async () => {
       try {
-        const response = await fetch("http://localhost:4000/api/calculations", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-        });
+        const headers = { "Authorization": `Bearer ${token}` };
+        const calcsRes = await fetch("http://localhost:4000/api/calculations", { headers });
 
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || "ไม่สามารถดึงข้อมูลได้");
+        if (!calcsRes.ok) {
+          throw new Error("ไม่สามารถดึงข้อมูลการคำนวณได้");
         }
+        
+        let calcsData = await calcsRes.json();
+        calcsData = calcsData.filter(calc => calc && calc.farm_id);
+        
+        setAllCalculations(calcsData); // 👈 (A) เก็บข้อมูลดิบ
 
-        const data = await response.json();
-        setCalculations(data); //  <-- อัปเดต State สำหรับ List (เหมือนเดิม)
+        // --- ⭐️ (B) (แก้ไข) ประมวลผลสำหรับ "กราฟรวมตามชนิดพืช" ---
+        const cropYieldMap = new Map();
 
-        // --- 3. (แก้ไข) เริ่มต้นการแปลงข้อมูลสำหรับกราฟ (แบบใหม่) ---
-
-        // 3.1. สร้าง Map สำหรับเก็บข้อมูล 6 เดือนย้อนหลัง
-        const monthMap = new Map();
-        const allCropNames = new Set(); // Set สำหรับเก็บชื่อพืชทั้งหมดที่พบ
-        const today = new Date();
-        const monthLabels = []; // Array สำหรับเก็บ "YYYY-MM" 6 เดือน
-
-        for (let i = 0; i < 6; i++) {
-          // สร้าง Date object สำหรับเดือนที่ i (0=ปัจจุบัน, 1=เดือนที่แล้ว, ...)
-          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          // แปลงเป็น "YYYY-MM"
-          const label = d.toISOString().substring(0, 7); 
-          
-          monthLabels.push(label);
-          // สร้าง object เริ่มต้นสำหรับเดือนนั้นๆ
-          monthMap.set(label, { name: label }); 
-        }
-
-        // 3.2. วนลูปข้อมูล (data) เพื่อกรองและรวมยอด
-        for (const calc of data) {
-          // ตรวจสอบว่ามีข้อมูล 'calc_date', 'crop_name', และ 'actual_yield'
-          if (!calc.calc_date || !calc.crop_name || calc.actual_yield == null) {
-            continue; // ข้ามถ้าข้อมูลไม่ครบ
-          }
-
-          const calcDate = new Date(calc.calc_date);
-          const calcMonthLabel = calcDate.toISOString().substring(0, 7);
-
-          // ตรวจสอบว่าข้อมูลนี้อยู่ใน 6 เดือนที่เราสนใจหรือไม่
-          if (monthMap.has(calcMonthLabel)) {
-            const cropName = calc.crop_name; // <-- (สำคัญ) สมมติว่า API ส่ง 'crop_name' มา
-            allCropNames.add(cropName); // เพิ่มชื่อพืชลงใน Set
+        for (const calc of calcsData) {
+          // เราจะนับเฉพาะ "ผลผลิตจริง" (actual_yield)
+          if (calc.crop_name && calc.actual_yield != null && calc.actual_yield > 0) {
             
-            const monthData = monthMap.get(calcMonthLabel);
+            const cropName = calc.crop_name;
+            const yieldAmount = calc.actual_yield;
 
-            // รวมยอด 'ผลผลิตที่ได้จริง' (actual_yield)
-            if (!monthData[cropName]) {
-              monthData[cropName] = 0;
+            // ถ้ายังไม่เคยเจอพืชนี้ ให้ set ค่าเริ่มต้น
+            if (!cropYieldMap.has(cropName)) {
+              cropYieldMap.set(cropName, 0);
             }
-            monthData[cropName] += calc.actual_yield;
+            // รวมยอด
+            cropYieldMap.set(cropName, cropYieldMap.get(cropName) + yieldAmount);
           }
         }
+        
+        // แปลง Map เป็น Array ที่ Recharts ใช้ได้ (และเรียงจากมากไปน้อย)
+        const newGraphData = Array.from(cropYieldMap.entries())
+          .map(([name, yieldValue]) => ({
+            name: name, // (เช่น "ลำไย", "มะม่วง")
+            "ผลผลิตจริง": yieldValue // (เช่น 50000, 25000)
+          }))
+          .sort((a, b) => b["ผลผลิตจริง"] - a["ผลผลิตจริง"]); // 👈 เรียงลำดับ
 
-        // 3.3. สร้าง Array ข้อมูลกราฟ และอัปเดต State
-        
-        // เรียงลำดับเดือนจากเก่าไปใหม่
-        const sortedMonthLabels = monthLabels.reverse(); // ["2025-06", ..., "2025-11"]
-        
-        const formattedGraphData = sortedMonthLabels.map(label => monthMap.get(label));
-        
-        setGraphData(formattedGraphData);
-        setCropNames(Array.from(allCropNames)); // อัปเดต State ชื่อพืช
-        
-        // --- สิ้นสุดการแก้ไขส่วนแปลงข้อมูล ---
+        setGraphData(newGraphData);
+        // setCropNames(Array.from(allCropNames)); // (ไม่จำเป็นต้องใช้แล้ว)
+
+        // --- (C) ประมวลผลสำหรับ "จัดกลุ่มฟาร์ม" (เหมือนเดิม) ---
+        const farmMap = new Map();
+        for (const calc of calcsData) {
+          if (!farmMap.has(calc.farm_id)) {
+            farmMap.set(calc.farm_id, {
+              farm_id: calc.farm_id,
+              farm_name: calc.farm_name,
+              location: calc.location,
+              crop_name: calc.crop_name,
+              calculation_count: 0,
+              latest_calc_date: new Date(0),
+            });
+          }
+          const farmData = farmMap.get(calc.farm_id);
+          farmData.calculation_count++;
+          if (new Date(calc.calc_date) > farmData.latest_calc_date) {
+            farmData.latest_calc_date = new Date(calc.calc_date);
+          }
+        }
+        const groupedFarms = Array.from(farmMap.values());
+        setAllFarms(groupedFarms);
+        setDisplayedFarms(groupedFarms);
 
       } catch (err) {
-        // (สำคัญ) แจ้งเตือนหาก API ไม่ได้ส่ง 'crop_name' มา
-        if (err instanceof TypeError && err.message.includes('crop_name')) {
-           setError("ข้อมูลที่ได้รับจาก API ไม่มี 'crop_name' จึงไม่สามารถสร้างกราฟชนิดใหม่ได้");
-        } else {
-           setError(err.message);
-        }
+        setError(err.message);
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchCalculations();
+    
+    fetchDashboardData();
   }, [navigate]);
 
+  
+  // ( ... useEffect (ค้นหาฟาร์ม) ... เหมือนเดิม)
+  useEffect(() => {
+    if (!searchTerm) {
+      setDisplayedFarms(allFarms);
+      return;
+    }
+    const lowerSearch = searchTerm.toLowerCase();
+    const filtered = allFarms.filter(farm => 
+      farm.farm_name.toLowerCase().includes(lowerSearch) ||
+      (farm.location && farm.location.toLowerCase().includes(lowerSearch))
+    );
+    setDisplayedFarms(filtered);
+  }, [searchTerm, allFarms]);
 
-  // --- ฟังก์ชัน renderContent (List) ... (เหมือนเดิม) ... ---
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="bg-white shadow rounded-xl p-6 text-center text-gray-500">
-          กำลังโหลดข้อมูลการคำนวณ...
-        </div>
-      );
-    }
-    if (error) {
-      return (
-        <div className="bg-white shadow rounded-xl p-6 text-center text-red-500">
-          เกิดข้อผิดพลาด: {error}
-        </div>
-      );
-    }
-    if (calculations.length === 0) {
-      return (
-        <div className="bg-white shadow rounded-xl p-6 text-center text-gray-500">
-          ยังไม่มีข้อมูลการคำนวณ
-        </div>
-      );
-    }
 
-    // วนลูปแสดง "ผลการคำนวณ"
-    return calculations.map((calc) => {
-      let diffPercent = null;
-      if (calc.actual_yield != null && calc.estimated_yield > 0) {
-        const diff = calc.actual_yield - calc.estimated_yield;
-        diffPercent = ((diff / calc.estimated_yield) * 100).toFixed(0);
-      }
-      
-      return (
-        <ProductCard
-          key={calc.id}
-          name={`${calc.farm_name} (จ. ${calc.location})`}
-          area={calc.area_rai ? calc.area_rai.toFixed(2) : '-'}
-          quality={calc.quality || '-'}
-          month={calc.harvest_month || '-'}
-          diff={diffPercent} // 👈 % ส่วนต่าง
-          onView={() => {
-            const dataForSummary = { 
-              preview: false, 
-              input: {
-                farm_id: calc.farm_id,
-                crop_type_id: calc.crop_type_id,
-                location: calc.location,
-                area_rai: calc.area_rai,
-                quality: calc.quality,
-                harvest_month: calc.harvest_month,
-                tree_age_avg: calc.tree_age_avg,
-                calc_date: calc.calc_date,
-              },
-              result: calc 
-            };
-            navigate(`/farm/${calc.farm_id}/summary`, { state: { calculationData: dataForSummary } });
-          }}
-        />
-      );
+  // ( ... ฟังก์ชัน handleDeleteFarm, executeDelete ... เหมือนเดิม)
+  const handleDeleteFarm = (farmId, farmName) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `ยืนันการลบสวน`,
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบสวน "${farmName}"?\nประวัติการคำนวณทั้งหมดของสวนนี้จะถูกลบอย่างถาวร`,
+      farmId: farmId
     });
   };
+  
+  const executeDelete = async () => {
+    const farmId = confirmModal.farmId;
+    const token = localStorage.getItem("token");
+    if (!token) { navigate("/login"); return; }
+    try {
+      const res = await fetch(`http://localhost:4000/api/farms/${farmId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "ลบไม่สำเร็จ");
+      }
+      setAllFarms(currentFarms => 
+        currentFarms.filter(farm => farm.farm_id !== farmId)
+      );
+      setAllCalculations(currentCalcs => 
+        currentCalcs.filter(calc => calc.farm_id !== farmId)
+      );
+      setModal({ isOpen: true, title: "ลบสำเร็จ", message: `สวนของคุณถูกลบเรียบร้อยแล้ว`, isError: false });
+    } catch (err) {
+      setModal({ isOpen: true, title: "เกิดข้อผิดพลาด", message: err.message, isError: true });
+    } finally {
+      setConfirmModal({ isOpen: false, title: '', message: '', farmId: null });
+    }
+  };
 
+  // ( ... ฟังก์ชัน handleAddNewCalculation, handleViewHistory ... เหมือนเดิม)
+  const handleAddNewCalculation = (farmId) => {
+    const latestCalc = allCalculations
+      .filter(c => c.farm_id === farmId)
+      .sort((a, b) => new Date(b.calc_date) - new Date(a.calc_date))[0];
+    let preloadData = {};
+    if (latestCalc) {
+      preloadData = {
+        location: latestCalc.location,
+        area_rai: latestCalc.area_rai,
+        quality: latestCalc.quality,
+        harvest_month: latestCalc.harvest_month,
+        tree_age_avg: latestCalc.tree_age_avg,
+      };
+    }
+    navigate(`/farm/${farmId}/calculate`, {
+      state: { preloadData }
+    });
+  };
+  const handleViewHistory = (farmId) => { navigate("/history"); };
+  const handleCloseModal = () => setModal({ ...modal, isOpen: false });
+  const handleCloseConfirmModal = () => setConfirmModal({ ...confirmModal, isOpen: false });
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header />
-      <main className="flex-1 p-4">
-        {/* ... (h1, p ... เหมือนเดิม) ... */}
+      <Navbar /> 
+      
+      {/* ( ... Popups ... เหมือนเดิม) */}
+      <Modal 
+        isOpen={modal.isOpen}
+        onClose={handleCloseModal}
+        title={modal.title}
+        message={modal.message}
+        isError={modal.isError}
+      />
+      <ConfirmModal 
+        isOpen={confirmModal.isOpen}
+        onClose={handleCloseConfirmModal}
+        onConfirm={executeDelete}
+        title={confirmModal.title}
+        message={confirmModal.message}
+      />
 
-        {/* --- 4. (แก้ไข) ส่วนกราฟ --- */}
-        <div className="bg-white shadow-md rounded-xl p-6 mb-4">
-          
+      <main className="flex-1 p-4 max-w-7xl mx-auto w-full"> 
+        
+        {/* --- ⭐️ (แก้ไข) ส่วนกราฟ (UI และ Logic ใหม่) --- */}
+        <div 
+          className={`bg-white shadow-md rounded-xl p-6 mb-8 transition-all duration-700 ease-out ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+        >
+          {/* ⭐️ (แก้ไข) 3.1 เปลี่ยน Title */}
           <h2 className="text-center text-green-900 font-semibold mb-3">
-            สรุปผลผลิตจริง 6 เดือนล่าสุด (แบ่งตามชนิดพืช)
+            สรุปผลผลิตจริง (รวมตามชนิดพืช)
           </h2>
-
           <div className="h-72 w-full min-w-[300px] min-h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              {/* 4.1. เปลี่ยน title และข้อมูล */}
-              <BarChart data={graphData}> 
-                <CartesianGrid strokeDasharray="3 3" />
-                {/* 4.2. XAxis "name" ตอนนี้คือ "YYYY-MM" */}
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                
-                {/* 4.3. (สำคัญ) สร้างแท่ง <Bar> แบบไดนามิกตาม 'cropNames' */}
-                {cropNames.map((crop, index) => (
-                  <Bar 
-                    key={crop} 
-                    dataKey={crop} // dataKey คือชื่อพืช (เช่น "ลำไย", "มะม่วง")
-                    fill={getColor(index)} // กำหนดสีให้ต่างกัน
-                    stackId="a" // (ทางเลือก) ถ้าอยากให้เป็นแท่งซ้อนกัน ให้ใส่ stackId
-                               // ถ้าอยากให้เป็นแท่งข้างกัน (Grouped) ให้ลบบรรทัด stackId="a"
-                  />
-                ))}
-                
-                {/* (ลบแท่ง <Bar> แบบคงที่ 2 อันเดิมออก) */}
-                {/* <Bar dataKey="ผลผลิตที่ได้จริง" fill="#ef4444" /> */}
-                {/* <Bar dataKey="ผลผลิตที่คาดหวัง" fill="#10b981" /> */}
-
-              </BarChart>
-            </ResponsiveContainer>
+            {isLoading ? <p>Loading graph...</p> : (
+              // ⭐️ (แก้ไข) 3.2 เปลี่ยน JSX ของกราฟ
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={graphData} // 👈 (ข้อมูลใหม่ เช่น [{ name: 'ลำไย', 'ผลผลิตจริง': 5000 }])
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                > 
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="ผลผลิตจริง">
+                    {/* ⭐️ นี่คือส่วนที่ทำให้แต่ละแท่งมีสีต่างกัน
+                      (ตามที่คุณขอว่า ลำไย สีหนึ่ง, มะม่วง อีกสีหนึ่ง)
+                    */}
+                    {graphData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getColor(index)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        {/* --- 5. ส่วนประวัติ (List) (เหมือนเดิม) --- */}
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-green-900 font-semibold">ผลการคำนวณล่าสุด</h2>
-          <button
-            onClick={() => navigate("/farmform")}
-            className="text-sm bg-green-700 text-white px-3 py-1 rounded-full shadow hover:bg-green-800 transition"
-          >
-            + เพิ่มสวน
-          </button>
+        {/* --- (UI ส่วนจัดการสวน ... เหมือนเดิม) --- */}
+        <div 
+          className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 transition-all duration-700 ease-out ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+          style={{ transitionDelay: '200ms' }}
+        >
+          <h2 className="text-2xl font-bold text-green-900">
+            สวนของคุณ
+          </h2>
+          <div className="flex flex-col md:flex-row gap-3">
+            <input 
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="ค้นหาชื่อสวน หรือ จังหวัด..."
+              className="w-full md:w-72 border border-gray-300 rounded-full px-5 py-2 text-base"
+            />
+            <button
+              onClick={() => navigate("/farmform")}
+              className="bg-green-700 text-white px-5 py-2 rounded-full shadow-md hover:bg-green-800 transition whitespace-nowrap"
+            >
+              + เพิ่มสวนใหม่
+            </button>
+          </div>
         </div>
+        
+        {/* --- (Grid แสดง FarmCard ... เหมือนเดิม) --- */}
+        {isLoading ? (
+          <p>กำลังโหลดข้อมูลสวน...</p>
+        ) : error ? (
+          <p className="text-red-500">เกิดข้อผิดพลาด: {error}</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {displayedFarms.length > 0 ? (
+              displayedFarms.map((farm, index) => (
+                <div 
+                  key={farm.farm_id} 
+                  className={`transition-all duration-500 ease-out ${
+                    isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+                  }`}
+                  style={{ transitionDelay: `${index * 100}ms` }}
+                >
+                  <FarmCard 
+                    farm={farm}
+                    onAddNew={() => handleAddNewCalculation(farm.farm_id)}
+                    onViewHistory={() => handleViewHistory(farm.farm_id)}
+                    onDeleteFarm={() => handleDeleteFarm(farm.farm_id, farm.farm_name)}
+                  />
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 md:col-span-2 lg:col-span-3 text-center py-10">
+                {searchTerm ? 'ไม่พบสวนที่ค้นหา' : 'คุณยังไม่มีสวน (กด "เพิ่มสวนใหม่" เพื่อเริ่มต้น)'}
+              </p> 
+            )}
+          </div>
+        )}
 
-        <div className="space-y-3">{renderContent()}</div>
       </main>
       <Footer />
     </div>
