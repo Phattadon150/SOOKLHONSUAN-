@@ -1,35 +1,90 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; 
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import Header from "../components/Header"; 
+import Footer from "../components/Footer"; 
 
 export default function FarmForm() {
   const navigate = useNavigate();
   const [farmName, setFarmName] = useState("");
-  const [selectedCrop, setSelectedCrop] = useState("");
+  const [selectedCropId, setSelectedCropId] = useState(""); 
+  const [cropTypesList, setCropTypesList] = useState([]); 
+  const [isLoading, setIsLoading] = useState(true);
 
-  const user = localStorage.getItem("currentUser");
-  const cropOptions = ["ลำไย", "มะนาว", "มะกรูด", "พริก", "มะม่วง"];
+  // --- 🌟 2. เพิ่ม useEffect (ดึงข้อมูลพืชจาก API) ---
+  useEffect(() => {
+    const fetchCropTypes = async () => {
+      try {
+        const response = await fetch("http://localhost:4000/api/crop-types");
+        
+        if (!response.ok) {
+          throw new Error("ไม่สามารถโหลดข้อมูลชนิดพืชได้");
+        }
+        
+        const data = await response.json();
+        setCropTypesList(data);
+        
+      } catch (error) {
+        console.error("Fetch crop types error:", error);
+        alert("เกิดข้อผิดพลาดในการโหลดข้อมูลพืช: " + error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const handleSubmit = (e) => {
+    fetchCropTypes();
+  }, []);
+
+  
+  // --- 🌟 3. แก้ไข handleSubmit (ส่งข้อมูลไป Backend) ---
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!farmName || !selectedCrop) {
+    if (!farmName || !selectedCropId) {
       alert("กรุณากรอกชื่อสวนและเลือกพืช");
       return;
     }
 
-    const farmData = {
-      user,
-      farmName,
-      crop: selectedCrop,
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("ไม่พบข้อมูลผู้ใช้, กรุณาเข้าสู่ระบบใหม่");
+      navigate("/login");
+      return;
+    }
+    
+    const payload = {
+      name: farmName,
+      crop_type_id: parseInt(selectedCropId)
     };
 
-    // ✅ เก็บข้อมูลสวนของผู้ใช้
-    localStorage.setItem(`farmData_${user}`, JSON.stringify(farmData));
-    console.log("✅ farmData saved:", farmData);
+    try {
+      const response = await fetch("http://localhost:4000/api/farms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json(); // 👈 data ที่ได้กลับมาคือ { id: 1, name: '...', ... }
 
-    // ✅ ไปหน้า Dashboard หลังบันทึก
-    navigate("/dashboard");
+      if (!response.ok) {
+        throw new Error(data.error || "มีบางอย่างผิดพลาด");
+      }
+
+      // --- 🌟 🌟 🌟 นี่คือจุดที่แก้ไข 🌟 🌟 🌟 ---
+      
+      alert("สร้างฟาร์มสำเร็จ! กำลังไปหน้าคำนวณผลผลิต...");
+      
+      // (ข้อมูลฟาร์มใหม่จะอยู่ใน 'data'. เราจะใช้ 'data.id' เพื่อไปยังหน้า Calculate)
+      navigate(`/farm/${data.id}/calculate`); // 👈 ไปหน้า Calculate ของฟาร์มใหม่
+
+      // (ของเดิมคือ navigate("/dashboard");)
+      // --- 🌟 🌟 🌟 จบจุดที่แก้ไข 🌟 🌟 🌟 ---
+
+    } catch (error) {
+      console.error("Create farm error:", error);
+      alert("เกิดข้อผิดพลาดในการสร้างฟาร์ม: " + error.message);
+    }
   };
 
   return (
@@ -58,14 +113,18 @@ export default function FarmForm() {
           </h2>
 
           <select
-            value={selectedCrop}
-            onChange={(e) => setSelectedCrop(e.target.value)}
+            value={selectedCropId}
+            onChange={(e) => setSelectedCropId(e.target.value)}
             className="w-full border border-gray-300 rounded-full px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
+            disabled={isLoading}
           >
-            <option value="">-- เลือกพืช --</option>
-            {cropOptions.map((crop, index) => (
-              <option key={index} value={crop}>
-                {crop}
+            <option value="">
+              {isLoading ? "กำลังโหลดข้อมูลพืช..." : "-- เลือกพืช --"}
+            </option>
+            
+            {cropTypesList.map((crop) => (
+              <option key={crop.id} value={crop.id}>
+                {crop.name}
               </option>
             ))}
           </select>
@@ -73,8 +132,9 @@ export default function FarmForm() {
           <button
             type="submit"
             className="w-full bg-green-700 text-white py-2 rounded-full shadow hover:bg-green-800"
+            disabled={isLoading}
           >
-            ลงชื่อเข้าใช้
+            บันทึกสวน
           </button>
         </form>
       </main>

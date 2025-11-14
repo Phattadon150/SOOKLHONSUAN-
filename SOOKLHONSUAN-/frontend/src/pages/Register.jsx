@@ -18,7 +18,8 @@ export default function Register() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  // --- 🌟 นี่คือฟังก์ชันที่อัปเกรดแล้ว 🌟 ---
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const { email, firstName, lastName, username, password } = form;
 
@@ -27,18 +28,51 @@ export default function Register() {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
-    if (users.find((u) => u.username === username)) {
-      alert("ชื่อผู้ใช้นี้ถูกใช้แล้ว");
-      return;
+    // Backend จะตรวจสอบการซ้ำซ้อนให้เอง
+    // const users = JSON.parse(localStorage.getItem("users")) || [];
+    // if (users.find((u) => u.username === username)) {
+    //   alert("ชื่อผู้ใช้นี้ถูกใช้แล้ว");
+    //   return;
+    // }
+
+    try {
+      // สร้าง Payload ที่ตรงกับที่ Backend ต้องการ
+      const payload = {
+        firstname: firstName, // สังเกต: แปลง firstName -> firstname
+        lastname: lastName,   // สังเกต: แปลง lastName -> lastname
+        email: email,
+        username: username,
+        password: password,
+      };
+
+      // สมมติว่า Backend รันอยู่ที่ http://localhost:4000
+      const response = await fetch(
+        "http://localhost:4000/api/auth/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // ถ้า Backend ส่ง Error กลับมา (เช่น { error: "Email already exists" })
+        alert(data.error || "สมัครสมาชิกไม่สำเร็จ");
+        return;
+      }
+
+      // ถ้าสำเร็จ (Backend ตอบ 201 Created)
+      alert("สมัครสมาชิกสำเร็จ!");
+      navigate("/login"); // ไปหน้า Login หลังสมัครเสร็จ
+
+    } catch (error) {
+      console.error("Register error:", error);
+      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + error.message);
     }
-
-    const newUser = { email, firstName, lastName, username, password };
-    users.push(newUser);
-    localStorage.setItem("users", JSON.stringify(users));
-
-    alert("สมัครสมาชิกสำเร็จ!");
-    navigate("/login");
   };
 
   return (
@@ -64,14 +98,14 @@ export default function Register() {
 
           <div className="flex space-x-2">
             <input
-              name="firstName"
+              name="firstName" // React state ใช้ 'firstName'
               placeholder="ชื่อจริง"
               value={form.firstName}
               onChange={handleChange}
               className="w-1/2 border border-gray-300 rounded-full px-4 py-2"
             />
             <input
-              name="lastName"
+              name="lastName" // React state ใช้ 'lastName'
               placeholder="นามสกุล"
               value={form.lastName}
               onChange={handleChange}

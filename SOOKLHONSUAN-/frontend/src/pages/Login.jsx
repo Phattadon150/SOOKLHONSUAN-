@@ -8,20 +8,49 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  // --- 🌟 นี่คือฟังก์ชันที่อัปเกรดแล้ว 🌟 ---
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const users = JSON.parse(localStorage.getItem("users")) || [];
-    const user = users.find(
-      (u) => u.username === username && u.password === password
-    );
 
-    if (user) {
-      localStorage.setItem("currentUser", username);
-      localStorage.setItem("currentUserFullname", `${user.firstName} ${user.lastName}`);
-      alert(`ยินดีต้อนรับ ${user.firstName} ${user.lastName}`);
+    // const users = JSON.parse(localStorage.getItem("users")) || [];
+    // const user = users.find(
+    //   (u) => u.username === username && u.password === password
+    // );
+
+    try {
+      // สมมติว่า Backend รันอยู่ที่ http://localhost:4000
+      const response = await fetch("http://localhost:4000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // ถ้า Backend ส่ง Error กลับมา (เช่น { error: "Invalid email or password" })
+        alert(data.error || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+        return;
+      }
+
+      // ถ้า Login สำเร็จ (Backend ส่ง token และ user object กลับมา)
+      // if (user) {
+      //   localStorage.setItem("currentUser", username);
+      //   localStorage.setItem("currentUserFullname", `${user.firstName} ${user.lastName}`);
+      
+      // 💡 เก็บ token และ user object ที่ได้จาก Backend
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user)); // เก็บ object user ทั้งก้อน
+
+      // สังเกต: เราใช้ data.user.firstname (ตัวเล็ก) ที่ได้จาก Backend
+      alert(`ยินดีต้อนรับ ${data.user.firstname} ${data.user.lastname}`);
       navigate("/farmform");
-    } else {
-      alert("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+      
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + error.message);
     }
   };
 

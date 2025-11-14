@@ -5,10 +5,10 @@ import Footer from "../components/Footer";
 export default function Landing() {
   return (
     <div className="flex flex-col min-h-screen bg-[#F5F5F5] text-gray-800">
-      {/* ใช้ Header เดิม */}
+      {/* ✅ ใช้ Header เดิม */}
       <Header />
 
-      {/* เนื้อหา Landing */}
+      {/* ✅ เนื้อหา Landing */}
       <main className="flex flex-col flex-1 items-center justify-center px-6 py-12 text-center">
         <div className="max-w-3xl">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-green-800 mb-4 leading-tight">
@@ -36,13 +36,13 @@ export default function Landing() {
         </div>
       </main>
 
-      {/* ส่วนฟีเจอร์ */}
+      {/* ✅ ส่วนฟีเจอร์ */}
       <section className="bg-white py-12 px-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {[
             "คำนวณผลผลิตจากจำนวนต้น",
             "ดูแนวโน้มผลผลิตด้วยกราฟ",
-           <>บันทึกผลและเปรียบเทียบ<br />รอบก่อนหน้า</>,
+            "บันทึกผลและเปรียบเทียบรอบก่อนหน้า",
             "ประเมินมูลค่าสวนอัตโนมัติ",
           ].map((text, i) => (
             <div
