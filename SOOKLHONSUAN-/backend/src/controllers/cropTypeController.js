@@ -1,15 +1,18 @@
 const pool = require('../db');
 
 const getCropTypes = async (req, res) => {
-  console.log('[API] GET /api/crop-types - Received request'); // 👈 เพิ่ม
+  console.log('--- [CropTypeController: getCropTypes] เริ่มต้น ---');
   try {
+    console.log('[CropType: getAll] กำลังดึงข้อมูลชนิดพืชทั้งหมด...');
     const { rows } = await pool.query(
       'SELECT id, name, description FROM crop_types ORDER BY id ASC'
     );
-    console.log(`✅ [API] GET /api/crop-types - Success: Sent ${rows.length} crop types`); // 👈 เพิ่ม
+    console.log(`[CropType: getAll] พบชนิดพืช ${rows.length} รายการ`);
     res.json(rows);
+
   } catch (err) {
-    console.error(`❌ [API] GET /api/crop-types - Server Error: ${err.message}`); // 👈 เพิ่ม
+    console.error('--- [CropTypeController: getCropTypes] เกิดข้อผิดพลาด ---');
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };

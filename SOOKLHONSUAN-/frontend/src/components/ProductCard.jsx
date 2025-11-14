@@ -11,10 +11,10 @@ export default function ProductCard({ name, area, diff, quality, month, onView }
       <div className="text-right">
         <p className="text-red-500 font-bold">{diff}%</p>
         <button
-          onClick={onView}
+          onClick={onView} // ⭐️ รับ prop onView มาใช้งาน
           className="text-green-700 text-sm underline hover:text-green-900"
         >
-          ดูเพิ่มเติม
+          ดูรายละเอียด
         </button>
       </div>
     </div>

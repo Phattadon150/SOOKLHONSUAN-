@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ ต้องมีเพื่อใช้ navigate
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
@@ -14,142 +14,247 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// --- 1. เพิ่ม State สำหรับเก็บชื่อพืชผล (สำหรับสร้างแท่งกราฟ) ---
+const [cropNames, setCropNames] = useState([]);
+
+// --- 2. เพิ่มฟังก์ชันสำหรับกำหนดสี (เพื่อให้แต่ละพืชมีสีต่างกัน) ---
+const COLORS = ["#10b981", "#ef4444", "#3b82f6", "#f97316", "#8b5cf6", "#ec4899"];
+const getColor = (index) => COLORS[index % COLORS.length];
+
+
 export default function Dashboard() {
-  const navigate = useNavigate(); // ✅ ใช้เปลี่ยนหน้า
-  const user = localStorage.getItem("currentUser");
-  const farmData = JSON.parse(localStorage.getItem(`farmData_${user}`));
+  const navigate = useNavigate();
 
-  const farmName = farmData?.farmName || "ชื่อสวนของคุณ";
-  const crop = farmData?.crop || null;
+  const [calculations, setCalculations] = useState([]);
+  const [graphData, setGraphData] = useState([]);
+  
+  // --- 1. (เพิ่ม) State สำหรับเก็บชื่อพืชผล ---
+  const [cropNames, setCropNames] = useState([]);
 
-  // ✅ เตรียมข้อมูล ProductCard จากสิ่งที่เลือกใน FarmForm
-  const data = crop
-    ? [
-        {
-          name: crop,
-          area: 5,
-          diff: 0,
-          quality: "ยังไม่มีข้อมูลคุณภาพ",
-          month: "ยังไม่มีเดือนเก็บเกี่ยว",
-        },
-      ]
-    : [];
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const hasData = data.length > 0;
+  // --- 2. (เพิ่ม) ฟังก์ชันสี ---
+  const COLORS = ["#10b981", "#ef4444", "#3b82f6", "#f97316", "#8b5cf6", "#ec4899"];
+  const getColor = (index) => COLORS[index % COLORS.length];
 
-  // ✅ ฟังก์ชัน state สำหรับ “เพิ่มผลผลิต”
-  const [adding, setAdding] = useState(false);
-  const [newCrop, setNewCrop] = useState("");
+  useEffect(() => {
+    const fetchCalculations = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
 
-  const handleAddCrop = () => {
-    if (!newCrop) {
-      alert("กรุณาเลือกพืชก่อน");
-      return;
+      try {
+        const response = await fetch("http://localhost:4000/api/calculations", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "ไม่สามารถดึงข้อมูลได้");
+        }
+
+        const data = await response.json();
+        setCalculations(data); //  <-- อัปเดต State สำหรับ List (เหมือนเดิม)
+
+        // --- 3. (แก้ไข) เริ่มต้นการแปลงข้อมูลสำหรับกราฟ (แบบใหม่) ---
+
+        // 3.1. สร้าง Map สำหรับเก็บข้อมูล 6 เดือนย้อนหลัง
+        const monthMap = new Map();
+        const allCropNames = new Set(); // Set สำหรับเก็บชื่อพืชทั้งหมดที่พบ
+        const today = new Date();
+        const monthLabels = []; // Array สำหรับเก็บ "YYYY-MM" 6 เดือน
+
+        for (let i = 0; i < 6; i++) {
+          // สร้าง Date object สำหรับเดือนที่ i (0=ปัจจุบัน, 1=เดือนที่แล้ว, ...)
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          // แปลงเป็น "YYYY-MM"
+          const label = d.toISOString().substring(0, 7); 
+          
+          monthLabels.push(label);
+          // สร้าง object เริ่มต้นสำหรับเดือนนั้นๆ
+          monthMap.set(label, { name: label }); 
+        }
+
+        // 3.2. วนลูปข้อมูล (data) เพื่อกรองและรวมยอด
+        for (const calc of data) {
+          // ตรวจสอบว่ามีข้อมูล 'calc_date', 'crop_name', และ 'actual_yield'
+          if (!calc.calc_date || !calc.crop_name || calc.actual_yield == null) {
+            continue; // ข้ามถ้าข้อมูลไม่ครบ
+          }
+
+          const calcDate = new Date(calc.calc_date);
+          const calcMonthLabel = calcDate.toISOString().substring(0, 7);
+
+          // ตรวจสอบว่าข้อมูลนี้อยู่ใน 6 เดือนที่เราสนใจหรือไม่
+          if (monthMap.has(calcMonthLabel)) {
+            const cropName = calc.crop_name; // <-- (สำคัญ) สมมติว่า API ส่ง 'crop_name' มา
+            allCropNames.add(cropName); // เพิ่มชื่อพืชลงใน Set
+            
+            const monthData = monthMap.get(calcMonthLabel);
+
+            // รวมยอด 'ผลผลิตที่ได้จริง' (actual_yield)
+            if (!monthData[cropName]) {
+              monthData[cropName] = 0;
+            }
+            monthData[cropName] += calc.actual_yield;
+          }
+        }
+
+        // 3.3. สร้าง Array ข้อมูลกราฟ และอัปเดต State
+        
+        // เรียงลำดับเดือนจากเก่าไปใหม่
+        const sortedMonthLabels = monthLabels.reverse(); // ["2025-06", ..., "2025-11"]
+        
+        const formattedGraphData = sortedMonthLabels.map(label => monthMap.get(label));
+        
+        setGraphData(formattedGraphData);
+        setCropNames(Array.from(allCropNames)); // อัปเดต State ชื่อพืช
+        
+        // --- สิ้นสุดการแก้ไขส่วนแปลงข้อมูล ---
+
+      } catch (err) {
+        // (สำคัญ) แจ้งเตือนหาก API ไม่ได้ส่ง 'crop_name' มา
+        if (err instanceof TypeError && err.message.includes('crop_name')) {
+           setError("ข้อมูลที่ได้รับจาก API ไม่มี 'crop_name' จึงไม่สามารถสร้างกราฟชนิดใหม่ได้");
+        } else {
+           setError(err.message);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCalculations();
+  }, [navigate]);
+
+
+  // --- ฟังก์ชัน renderContent (List) ... (เหมือนเดิม) ... ---
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="bg-white shadow rounded-xl p-6 text-center text-gray-500">
+          กำลังโหลดข้อมูลการคำนวณ...
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <div className="bg-white shadow rounded-xl p-6 text-center text-red-500">
+          เกิดข้อผิดพลาด: {error}
+        </div>
+      );
+    }
+    if (calculations.length === 0) {
+      return (
+        <div className="bg-white shadow rounded-xl p-6 text-center text-gray-500">
+          ยังไม่มีข้อมูลการคำนวณ
+        </div>
+      );
     }
 
-    // จำลองเพิ่มพืชใหม่ (จริง ๆ ควรเก็บใน localStorage เพิ่มเป็น array ของพืชในอนาคต)
-    navigate(`/product/${newCrop}`);
+    // วนลูปแสดง "ผลการคำนวณ"
+    return calculations.map((calc) => {
+      let diffPercent = null;
+      if (calc.actual_yield != null && calc.estimated_yield > 0) {
+        const diff = calc.actual_yield - calc.estimated_yield;
+        diffPercent = ((diff / calc.estimated_yield) * 100).toFixed(0);
+      }
+      
+      return (
+        <ProductCard
+          key={calc.id}
+          name={`${calc.farm_name} (จ. ${calc.location})`}
+          area={calc.area_rai ? calc.area_rai.toFixed(2) : '-'}
+          quality={calc.quality || '-'}
+          month={calc.harvest_month || '-'}
+          diff={diffPercent} // 👈 % ส่วนต่าง
+          onView={() => {
+            const dataForSummary = { 
+              preview: false, 
+              input: {
+                farm_id: calc.farm_id,
+                crop_type_id: calc.crop_type_id,
+                location: calc.location,
+                area_rai: calc.area_rai,
+                quality: calc.quality,
+                harvest_month: calc.harvest_month,
+                tree_age_avg: calc.tree_age_avg,
+                calc_date: calc.calc_date,
+              },
+              result: calc 
+            };
+            navigate(`/farm/${calc.farm_id}/summary`, { state: { calculationData: dataForSummary } });
+          }}
+        />
+      );
+    });
   };
 
-  // กราฟ mock เหมือนเดิม
-  const graphData = [
-    { name: "รอบที่ 1", "ผลผลิตที่ได้จริง": 1500 },
-    { name: "รอบที่ 2", "ผลผลิตที่คาดหวัง": 2500 },
-  ];
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Header />
-
       <main className="flex-1 p-4">
-        {/* ชื่อสวน */}
-        <h1 className="text-center text-xl font-bold text-green-800 mb-2">
-          {farmName}
-        </h1>
-        <p className="text-center text-gray-600 mb-4">แสดงภาพรวมของสวน</p>
+        {/* ... (h1, p ... เหมือนเดิม) ... */}
 
-        {/* กราฟ */}
+        {/* --- 4. (แก้ไข) ส่วนกราฟ --- */}
         <div className="bg-white shadow-md rounded-xl p-6 mb-4">
+          
           <h2 className="text-center text-green-900 font-semibold mb-3">
-            แนวโน้มผลผลิต
+            สรุปผลผลิตจริง 6 เดือนล่าสุด (แบ่งตามชนิดพืช)
           </h2>
+
           <div className="h-72 w-full min-w-[300px] min-h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={graphData}>
+              {/* 4.1. เปลี่ยน title และข้อมูล */}
+              <BarChart data={graphData}> 
                 <CartesianGrid strokeDasharray="3 3" />
+                {/* 4.2. XAxis "name" ตอนนี้คือ "YYYY-MM" */}
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="ผลผลิตที่ได้จริง" fill="#ef4444" />
-                <Bar dataKey="ผลผลิตที่คาดหวัง" fill="#10b981" />
+                
+                {/* 4.3. (สำคัญ) สร้างแท่ง <Bar> แบบไดนามิกตาม 'cropNames' */}
+                {cropNames.map((crop, index) => (
+                  <Bar 
+                    key={crop} 
+                    dataKey={crop} // dataKey คือชื่อพืช (เช่น "ลำไย", "มะม่วง")
+                    fill={getColor(index)} // กำหนดสีให้ต่างกัน
+                    stackId="a" // (ทางเลือก) ถ้าอยากให้เป็นแท่งซ้อนกัน ให้ใส่ stackId
+                               // ถ้าอยากให้เป็นแท่งข้างกัน (Grouped) ให้ลบบรรทัด stackId="a"
+                  />
+                ))}
+                
+                {/* (ลบแท่ง <Bar> แบบคงที่ 2 อันเดิมออก) */}
+                {/* <Bar dataKey="ผลผลิตที่ได้จริง" fill="#ef4444" /> */}
+                {/* <Bar dataKey="ผลผลิตที่คาดหวัง" fill="#10b981" /> */}
+
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* ส่วนผลผลิต */}
+        {/* --- 5. ส่วนประวัติ (List) (เหมือนเดิม) --- */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-green-900 font-semibold">ผลผลิต</h2>
-
-          {/* ✅ ปุ่มเพิ่มผลผลิตพร้อม dropdown */}
-          {adding ? (
-            <div className="flex items-center space-x-3">
-              <select
-                value={newCrop}
-                onChange={(e) => setNewCrop(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1"
-              >
-                <option value="">-- เลือกพืช --</option>
-                <option value="ลำไย">ลำไย</option>
-                <option value="มะนาว">มะนาว</option>
-                <option value="พริก">พริก</option>
-                <option value="มะม่วง">มะม่วง</option>
-                <option value="มะกรูด">มะกรูด</option>
-              </select>
-              <button
-                onClick={handleAddCrop}
-                className="bg-green-700 text-white px-3 py-1 rounded-lg hover:bg-green-800"
-              >
-                ไปยังรายละเอียด
-              </button>
-              <button
-                onClick={() => setAdding(false)}
-                className="bg-gray-300 text-gray-700 px-2 py-1 rounded-lg hover:bg-gray-400"
-              >
-                ✖
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAdding(true)}
-              className="text-sm bg-green-700 text-white px-3 py-1 rounded-full shadow hover:bg-green-800 transition"
-            >
-              + เพิ่มผลผลิต
-            </button>
-          )}
+          <h2 className="text-green-900 font-semibold">ผลการคำนวณล่าสุด</h2>
+          <button
+            onClick={() => navigate("/farmform")}
+            className="text-sm bg-green-700 text-white px-3 py-1 rounded-full shadow hover:bg-green-800 transition"
+          >
+            + เพิ่มสวน
+          </button>
         </div>
 
-        {/* แสดงผลผลิต */}
-        {hasData ? (
-          data.map((item, i) => (
-            <ProductCard
-              key={i}
-              name={item.name}
-              area={item.area}
-              diff={item.diff}
-              quality={item.quality}
-              month={item.month}
-              onView={() => navigate(`/product/${item.name}`)} // ✅ ดูรายละเอียด
-            />
-          ))
-        ) : (
-          <div className="bg-white shadow rounded-xl p-6 text-center text-gray-500">
-            ยังไม่มีข้อมูลสวนของคุณ
-          </div>
-        )}
+        <div className="space-y-3">{renderContent()}</div>
       </main>
-
       <Footer />
     </div>
   );

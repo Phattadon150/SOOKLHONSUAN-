@@ -1,34 +1,50 @@
 const pool = require('../db');
 
+// --- 1. สร้างฟาร์ม ---
 const createFarm = async (req, res) => {
-  const userId = req.user.userId;
-  const { name, crop_type_id } = req.body;
-  console.log(`[API] POST /api/farms - User ID: ${userId} creating farm with name: ${name}`); // 👈 เพิ่ม
-
-  if (!name || !crop_type_id) {
-    console.warn(`[API] POST /api/farms - Validation Failed: Missing fields`); // 👈 เพิ่ม
-    return res.status(400).json({ error: 'name and crop_type_id are required' });
-  }
-
+  console.log('--- [FarmController: createFarm] เริ่มต้น ---');
   try {
+    const userId = req.user.userId;
+    const { name, crop_type_id } = req.body;
+    console.log(`[Farm: create] UserID: ${userId}, Body:`, req.body);
+
+    if (!name || !crop_type_id) {
+      console.warn('[Farm: create] Validation Failed: ข้อมูลไม่ครบ');
+      return res.status(400).json({ error: 'name and crop_type_id are required' });
+    }
+
+    console.log('[Farm: create] กำลังบันทึก Farm ลงฐานข้อมูล...');
     const { rows } = await pool.query(
       `INSERT INTO farms (user_id, name, crop_type_id)
        VALUES ($1, $2, $3)
-       RETURNING id, name, crop_type_id, created_at`,
+       RETURNING id, name, crop_type_id`,
       [userId, name, crop_type_id]
+      
     );
-    console.log(`✅ [API] POST /api/farms - Success: Farm created, ID: ${rows[0].id}`); // 👈 เพิ่ม
+
+    if (!rows[0] || !rows[0].id) {
+       console.error('[Farm: create] Error: สร้างฟาร์มไม่สำเร็จ หรือไม่ได้ ID กลับมา');
+       return res.status(500).json({ error: 'Failed to create farm or retrieve ID' });
+        
+    }
+
+    console.log('[Farm: create] สร้าง Farm สำเร็จ, กำลังส่งข้อมูลกลับ:', rows[0]);
     res.status(201).json(rows[0]);
+
   } catch (err) {
-    console.error(`❌ [API] POST /api/farms - Server Error: ${err.message}`); // 👈 เพิ่ม
+    console.error('--- [FarmController: createFarm] เกิดข้อผิดพลาด ---');
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
+// --- 2. ดึงฟาร์มทั้งหมด ---
 const getFarms = async (req, res) => {
-  const userId = req.user.userId;
-  console.log(`[API] GET /api/farms - User ID: ${userId} fetching all farms`); // 👈 เพิ่ม
+  console.log('--- [FarmController: getFarms] เริ่มต้น ---');
   try {
+    const userId = req.user.userId;
+    console.log(`[Farm: getFarms] กำลังดึงฟาร์มทั้งหมดของ User ID: ${userId}`);
+
     const { rows } = await pool.query(
       `SELECT f.id, f.name, f.crop_type_id, c.name AS crop_name, f.created_at
        FROM farms f
@@ -37,90 +53,134 @@ const getFarms = async (req, res) => {
        ORDER BY f.created_at DESC`,
       [userId]
     );
-    console.log(`✅ [API] GET /api/farms - Success: Sent ${rows.length} farms for user ID: ${userId}`); // 👈 เพิ่ม
+
+    console.log(`[Farm: getFarms] พบฟาร์มจำนวน: ${rows.length} แห่ง`);
     res.json(rows);
+
   } catch (err) {
-    console.error(`❌ [API] GET /api/farms - Server Error: ${err.message}`); // 👈 เพิ่ม
+    console.error('--- [FarmController: getFarms] เกิดข้อผิดพลาด ---');
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
+
+// --- 3. ดึงฟาร์มทีละตัว (By ID) ---
 const getFarmById = async (req, res) => {
-  const userId = req.user.userId;
-  const { id } = req.params;
-  console.log(`[API] GET /api/farms/:id - User ID: ${userId} fetching farm ID: ${id}`); // 👈 เพิ่ม
+  console.log('--- [FarmController: getFarmById] เริ่มต้น ---');
   try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    console.log(`[Farm: getById] UserID: ${userId}, FarmID (จาก URL): ${id}`);
+
+    const farmId = parseInt(id, 10);
+    
+    if (isNaN(farmId) || farmId <= 0) {
+      console.warn(`[Farm: getById] Error: Farm ID ไม่ถูกต้อง: ${id}`);
+      return res.status(400).json({ error: 'Invalid Farm ID format' });
+    }
+
     const { rows } = await pool.query(
       `SELECT f.id, f.name, f.crop_type_id, c.name AS crop_name, f.created_at
        FROM farms f
        LEFT JOIN crop_types c ON f.crop_type_id = c.id
        WHERE f.id = $1 AND f.user_id = $2`,
-      [id, userId]
+      [farmId, userId]
     );
+
     if (!rows.length) {
-      console.warn(`[API] GET /api/farms/:id - Failed: Farm not found or not owned by user (Farm ID: ${id}, User ID: ${userId})`); // 👈 เพิ่ม
+      console.warn(`[Farm: getById] Error: ไม่พบ Farm ID: ${farmId} ของ User: ${userId}`);
       return res.status(404).json({ error: 'Farm not found' });
     }
-    console.log(`✅ [API] GET /api/farms/:id - Success: Sent farm ID: ${id}`); // 👈 เพิ่ม
+
+    console.log('[Farm: getById] พบฟาร์ม:', rows[0]);
     res.json(rows[0]);
+
   } catch (err) {
-    console.error(`❌ [API] GET /api/farms/:id - Server Error: ${err.message}`); // 👈 เพิ่ม
+    console.error('--- [FarmController: getFarmById] เกิดข้อผิดพลาด ---');
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
+// --- 4. อัปเดตฟาร์ม ---
 const updateFarm = async (req, res) => {
-  const userId = req.user.userId;
-  const { id } = req.params;
-  const { name, crop_type_id } = req.body;
-  console.log(`[API] PUT /api/farms/:id - User ID: ${userId} updating farm ID: ${id}`); // 👈 เพิ่ม
-
+  console.log('--- [FarmController: updateFarm] เริ่มต้น ---');
   try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { name, crop_type_id } = req.body;
+    console.log(`[Farm: update] UserID: ${userId}, FarmID: ${id}, Body:`, req.body);
+
+    const farmId = parseInt(id, 10);
+    if (isNaN(farmId) || farmId <= 0) {
+      return res.status(400).json({ error: 'Invalid Farm ID format' });
+    }
+
     const { rows } = await pool.query(
       `UPDATE farms
        SET name = COALESCE($1, name),
            crop_type_id = COALESCE($2, crop_type_id)
        WHERE id = $3 AND user_id = $4
-       RETURNING id, name, crop_type_id, created_at`,
-      [name, crop_type_id, id, userId]
+       RETURNING id, name, crop_type_id`,
+      [name, crop_type_id, farmId, userId]
     );
+
     if (!rows.length) {
-      console.warn(`[API] PUT /api/farms/:id - Failed: Farm not found or not owned (Farm ID: ${id}, User ID: ${userId})`); // 👈 เพิ่ม
       return res.status(404).json({ error: 'Farm not found or not yours' });
     }
-    console.log(`✅ [API] PUT /api/farms/:id - Success: Updated farm ID: ${id}`); // 👈 เพิ่ม
+
+    console.log('[Farm: update] อัปเดตฟาร์มสำเร็จ:', rows[0]);
     res.json(rows[0]);
+
   } catch (err) {
-    console.error(`❌ [API] PUT /api/farms/:id - Server Error: ${err.message}`); // 👈 เพิ่ม
+    console.error('--- [FarmController: updateFarm] เกิดข้อผิดพลาด ---');
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
+// --- 5. ลบฟาร์ม ---
 const deleteFarm = async (req, res) => {
-  const userId = req.user.userId;
-  const { id } = req.params;
-  console.log(`[API] DELETE /api/farms/:id - User ID: ${userId} deleting farm ID: ${id}`); // 👈 เพิ่ม
+  console.log('--- [FarmController: deleteFarm] เริ่มต้น ---');
   try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    console.log(`[Farm: delete] UserID: ${userId}, FarmID: ${id}`);
+
+    const farmId = parseInt(id, 10);
+    if (isNaN(farmId) || farmId <= 0) {
+      return res.status(400).json({ error: 'Invalid Farm ID format' });
+    }
+
     const result = await pool.query(
       'DELETE FROM farms WHERE id = $1 AND user_id = $2',
-      [id, userId]
+      [farmId, userId]
     );
+
     if (result.rowCount === 0) {
-      console.warn(`[API] DELETE /api/farms/:id - Failed: Farm not found or not owned (Farm ID: ${id}, User ID: ${userId})`); // 👈 เพิ่ม
       return res.status(404).json({ error: 'Farm not found or not yours' });
     }
-    console.log(`✅ [API] DELETE /api/farms/:id - Success: Deleted farm ID: ${id}`); // 👈 เพิ่ม
+
+    console.log(`[Farm: delete] ลบ Farm ID: ${farmId} สำเร็จ`);
     res.json({ message: 'Farm deleted successfully' });
+
   } catch (err) {
-    console.error(`❌ [API] DELETE /api/farms/:id - Server Error: ${err.message}`); // 👈 เพิ่ม
+    console.error('--- [FarmController: deleteFarm] เกิดข้อผิดพลาด ---');
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
+
+
+// ⭐️ --- START: นี่คือจุดที่ Error Log ฟ้อง ⭐️ ---
+// (ที่บรรทัด 84 ใน Error Log)
 
 module.exports = {
   createFarm,
-  getFarms,
+  getFarms,     // ✅ ต้องเป็น F พิมพ์ใหญ่ (ตรงกับชื่อฟังก์ชัน)
   getFarmById,
-  updateFarm,
-  deleteFarm
+  updateFarm,   // ✅ เพิ่ม 2 บรรทัดนี้
+  deleteFarm    // ✅ (เพราะ farm.js เรียกใช้)
 };
+// ⭐️ --- END --- ⭐️
