@@ -1,48 +1,42 @@
-// Login.jsx (ฉบับแก้ไข)
+// frontend/src/Login.jsx (ฉบับอัปเดต Google)
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import Modal from "../components/Modal"; // ⭐️ 1. Import Modal
+import Modal from "../components/Modal";
+import { GoogleLogin } from '@react-oauth/google'; // ⭐️ 1. Import GoogleLogin
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  // ⭐️ 2. (ใหม่) State สำหรับ Modal และ Animation
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
   const [isVisible, setIsVisible] = useState(false);
 
-  // (Effect สำหรับ Animation)
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
-  // ⭐️ 3. (ใหม่) ฟังก์ชันสำหรับปิด Modal
   const handleCloseModal = () => {
-    // ถ้า Modal ที่ปิดเป็น 'success' (Login สำเร็จ)
     if (modal.type === 'success') {
-      navigate("/"); // 👈 (แก้ไข) 4. ไปที่หน้า Landing
+      navigate("/"); 
     }
     setModal({ isOpen: false, title: '', message: '', type: 'info' });
   };
 
+  // --- (ฟังก์ชัน handleLogin เดิม) ---
   const handleLogin = async (e) => {
     e.preventDefault();
-
     try {
       const response = await fetch("http://localhost:4000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
-        // ⭐️ (แก้ไข) 5. เปลี่ยน alert เป็น Modal
         setModal({ 
           isOpen: true, 
           title: "เข้าสู่ระบบผิดพลาด", 
@@ -51,23 +45,11 @@ export default function Login() {
         });
         return;
       }
-
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("username", data.user.username);
-
-      // ⭐️ (แก้ไข) 6. แสดง Modal ต้อนรับ (แทน alert)
-      setModal({
-        isOpen: true,
-        title: "เข้าสู่ระบบสำเร็จ!",
-        message: `ยินดีต้อนรับ ${data.user.firstname} ${data.user.lastname}`,
-        type: 'success' // 👈 (สำคัญ)
-      });
-      // (เราจะ navigate ในฟังก์ชัน handleCloseModal)
+      // ⭐️ 2. (ปรับปรุง) สร้างฟังก์ชันช่วย เพื่อไม่ให้โค้ดซ้ำ
+      handleLoginSuccess(data.token, data.user);
       
     } catch (error) {
       console.error("Login error:", error);
-      // ⭐️ (แก้ไข) 7. เปลี่ยน alert เป็น Modal
       setModal({
         isOpen: true,
         title: "เกิดข้อผิดพลาด",
@@ -77,11 +59,70 @@ export default function Login() {
     }
   };
 
+  // ⭐️ 3. (ใหม่) ฟังก์ชันสำหรับจัดการเมื่อ Login สำเร็จ (ใช้ร่วมกัน)
+  const handleLoginSuccess = (token, user) => {
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("username", user.username);
+    
+    setModal({
+      isOpen: true,
+      title: "เข้าสู่ระบบสำเร็จ!",
+      message: `ยินดีต้อนรับ ${user.firstname} ${user.lastname}`,
+      type: 'success'
+    });
+    // (จะ navigate ไปหน้า / เมื่อปิด Modal)
+  };
+
+  // ⭐️ 4. (ใหม่) ฟังก์ชันสำหรับ Google Login
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
+    const idToken = credentialResponse.credential;
+
+    try {
+      const response = await fetch("http://localhost:4000/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setModal({ isOpen: true, title: "Google Login ผิดพลาด", message: data.error || "ไม่สามารถยืนยัน Google Token ได้", type: 'error' });
+        return;
+      }
+
+      // ⭐️ 5. (สำคัญ) ตรวจสอบเคสที่ต้องตั้ง Username
+      if (data.status === 'NEED_USERNAME') {
+        // ส่งไปหน้าตั้ง Username พร้อม Token ชั่วคราว
+        navigate('/complete-google-signup', { 
+          state: { 
+            tempToken: data.temp_token, 
+            profile: data.google_profile 
+          } 
+        });
+      } else {
+        // Login สำเร็จ (มี User อยู่แล้ว)
+        handleLoginSuccess(data.token, data.user);
+      }
+
+    } catch (error) {
+      console.error("Google Login error:", error);
+      setModal({ isOpen: true, title: "เกิดข้อผิดพลาด", message: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ (Google) ได้", type: 'error' });
+    }
+  };
+
+  // ⭐️ 6. (ใหม่) ฟังก์ชันสำหรับ Google Login Error
+  const handleGoogleLoginError = () => {
+    console.error("Google Login Failed");
+    setModal({ isOpen: true, title: "Google Login ล้มเหลว", message: "การเข้าสู่ระบบด้วย Google ถูกยกเลิกหรือไม่สำเร็จ", type: 'error' });
+  };
+
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Navbar />
       
-      {/* ⭐️ 8. (ใหม่) แสดง Modal */}
       <Modal 
         isOpen={modal.isOpen}
         title={modal.title}
@@ -90,7 +131,6 @@ export default function Login() {
       />
       
       <main className="flex-1 flex flex-col items-center justify-center px-4">
-        {/* ⭐️ 9. (แก้ไข) เพิ่ม Animation ให้ฟอร์ม */}
         <form
           onSubmit={handleLogin}
           className={`bg-white shadow-md rounded-xl p-6 w-full max-w-md space-y-4 transition-all duration-700 ease-out ${
@@ -131,6 +171,24 @@ export default function Login() {
               ลืมรหัสผ่าน?
             </Link>
           </div>
+
+          {/* ⭐️ 7. (ใหม่) ตัวคั่น "หรือ" */}
+          <div className="flex items-center my-4">
+            <hr className="flex-grow border-t border-gray-300" />
+            <span className="mx-4 text-gray-500 text-sm">หรือ</span>
+            <hr className="flex-grow border-t border-gray-300" />
+          </div>
+
+          {/* ⭐️ 8. (ใหม่) ปุ่ม Google Login */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleLoginSuccess}
+              onError={handleGoogleLoginError}
+              useOneTap={false} // 👈 แนะนำให้ใช้ false ในหน้า Login
+              shape="pill"
+            />
+          </div>
+
         </form>
       </main>
       <Footer />
