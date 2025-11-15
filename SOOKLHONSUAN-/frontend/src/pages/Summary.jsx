@@ -1,11 +1,13 @@
-// Summary.jsx (ฉบับเต็มที่แก้ไขตรรกะ)
+// Summary.jsx (ฉบับแก้ไข: เปลี่ยน Alert เป็น Modal)
 
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Header from "../components/Header";
+import Navbar from "../components/Navbar"; 
 import Footer from "../components/Footer";
+import { motion } from "framer-motion";
+import AlertModal from "../components/AlertModal"; // ✅ 1. Import AlertModal
 
-// ( ... Helper function formatNum ... เหมือนเดิม )
+// ( ... Helper function formatNum ... )
 const formatNum = (num, digits = 0) => {
   const n = Number(num);
   if (!Number.isFinite(n) || n === 0) return digits === 0 ? "0" : "0.00"; 
@@ -24,17 +26,45 @@ export default function Summary() {
   
   const [isSaving, setIsSaving] = useState(false);
   
-  // ( ... State สำหรับโหมด "บันทึกผลผลิตจริง" (Update Mode) ... เหมือนเดิม )
+  // ( ... State สำหรับโหมด "บันทึกผลผลิตจริง" ... )
   const [actualYield, setActualYield] = useState("");
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
   const [diff, setDiff] = useState({ value: 0, percent: 0 });
 
-  // 2. ( ... โค้ดเช็ค ถ้าไม่มี calculationData ... เหมือนเดิม )
+  // ✅ 2. เพิ่ม State สำหรับ Modal
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    type: 'success', // 'success' หรือ 'error'
+    title: '',
+    message: ''
+  });
+
+  // ✅ 3. สร้างฟังก์ชันปิด Modal (และจัดการ Navigate)
+  const handleModalClose = () => {
+    const wasSuccess = modalState.type === 'success';
+    
+    // ปิด Modal
+    setModalState({ isOpen: false, type: 'success', title: '', message: '' });
+    
+    // ⭐️ สำคัญ: ถ้่Modal ที่เพิ่งปิดเป็น 'success' ให้ Navigate กลับ
+    // เราย้าย navigate() มาไว้ตรงนี้ เพราะเราอยากให้มันทำงาน "หลังจาก" ที่ผู้ใช้กดยืนยันใน Modal
+    if (wasSuccess) {
+      navigate("/dashboard");
+    }
+  };
+
+
+  // 2. ( ... โค้ดเช็ค ถ้าไม่มี calculationData ... )
   if (!calculationData) {
     return (
       <div className="flex flex-col min-h-screen bg-stone-50">
-        <Header />
-        <main className="flex-1 flex flex-col items-center justify-center">
+        <Navbar />
+        <motion.main 
+          className="flex-1 flex flex-col items-center justify-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <p className="text-red-500">ไม่พบข้อมูลการคำนวณ</p>
           <button 
             onClick={() => navigate('/dashboard')} 
@@ -42,13 +72,23 @@ export default function Summary() {
           >
             กลับไปหน้า Dashboard
           </button>
-        </main>
+        </motion.main>
         <Footer />
+        
+        {/* ✅ 5. วาง Modal (สำหรับ Path นี้ด้วย) */}
+        <AlertModal 
+          isOpen={modalState.isOpen}
+          onClose={handleModalClose}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+        />
       </div>
     );
   }
 
-  // 3. ( ... ตรรกะแยกแยะโหมดการทำงาน ... เหมือนเดิม )
+  // ( ... ส่วนตรรกะ, state, functions ... )
+  // 3. ( ... ตรรกะแยกแยะโหมดการทำงาน ... )
   const isPreview = calculationData.preview; 
   const isComparisonMode = isPreview && !!originalCalculation;
   const inputs = calculationData.input;
@@ -82,16 +122,28 @@ export default function Summary() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "บันทึกไม่สำเร็จ");
-      alert("บันทึกข้อมูลสำเร็จ!");
-      navigate("/dashboard"); 
+      
+      // ✅ 4. เปลี่ยนมาใช้ setModalState
+      setModalState({
+        isOpen: true,
+        type: 'success',
+        title: 'บันทึกสำเร็จ',
+        message: 'บันทึกข้อมูลการคำนวณใหม่เรียบร้อยแล้ว'
+      });
+
     } catch (err) {
-      alert(`บันทึกไม่สำเร็จ: ${err.message}`);
+      // ✅ 4. เปลี่ยนมาใช้ setModalState
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'บันทึกไม่สำเร็จ',
+        message: err.message
+      });
       setIsSaving(false);
     }
   };
 
-  // ⭐️ 5. (ใหม่) ฟังก์ชันสำหรับโหมด "อัปเดตการคำนวณ" (PUT)
-  // (ใช้เมื่อกด "แก้ไข/คำนวณใหม่" จาก Dashboard)
+  // 5. (ใหม่) ฟังก์ชันสำหรับโหมด "อัปเดตการคำนวณ" (PUT)
   const handleUpdateExisting = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -101,20 +153,14 @@ export default function Summary() {
         return;
     }
     
-    // (สำคัญ) เราใช้ ID จาก 'originalCalculation' ที่ส่งมาจาก Dashboard
     const updateId = originalCalculation.id; 
     
-    // Payload คือ "ข้อมูลใหม่" ทั้งหมด (Input ใหม่ + Estimate ใหม่)
     const payload = {
       ...inputs, // 👈 ข้อมูล input ใหม่ (จากหน้า Calculate)
       estimated_yield: results.estimated_yield // 👈 ผลลัพธ์ estimate ใหม่
-      
-      // (หมายเหตุ: actual_yield จะถูกตั้งค่าเป็น null ในฝั่ง backend
-      // เมื่อ estimated_yield ถูกอัปเดต, ซึ่งเป็นพฤติกรรมที่คาดหวัง)
     };
 
     try {
-      // ⭐️ ใช้ PUT และ URL ที่มี ID
       const res = await fetch(`http://localhost:4000/api/calculations/${updateId}`, {
         method: "PUT", 
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -124,11 +170,22 @@ export default function Summary() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "อัปเดตไม่สำเร็จ");
       
-      alert("อัปเดตข้อมูลคำนวณสำเร็จ!");
-      navigate("/dashboard"); 
+      // ✅ 4. เปลี่ยนมาใช้ setModalState
+      setModalState({
+        isOpen: true,
+        type: 'success',
+        title: 'อัปเดตสำเร็จ',
+        message: 'อัปเดตข้อมูลการคำนวณเรียบร้อยแล้ว'
+      });
 
     } catch (err) {
-      alert(`อัปเดตไม่สำเร็จ: ${err.message}`);
+      // ✅ 4. เปลี่ยนมาใช้ setModalState
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'อัปเดตไม่สำเร็จ',
+        message: err.message
+      });
       setIsSaving(false);
     }
   };
@@ -138,7 +195,6 @@ export default function Summary() {
   const handleUpdateActual = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    // ... (โค้ดส่วนนี้เหมือนเดิมทุกประการ) ...
     const token = localStorage.getItem("token");
     if (!token) {
         navigate('/login');
@@ -156,17 +212,29 @@ export default function Summary() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "บันทึกไม่สำเร็จ");
-      alert("บันทึกข้อมูลผลผลิตจริงสำเร็จ!");
-      navigate("/dashboard"); 
+      
+      // ✅ 4. เปลี่ยนมาใช้ setModalState
+      setModalState({
+        isOpen: true,
+        type: 'success',
+        title: 'บันทึกผลผลิตจริงสำเร็จ',
+        message: 'บันทึกข้อมูลผลผลิตจริงเรียบร้อยแล้ว'
+      });
+
     } catch (err) {
-      alert(`บันทึกไม่สำเร็จ: ${err.message}`);
+      // ✅ 4. เปลี่ยนมาใช้ setModalState
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'บันทึกไม่สำเร็จ',
+        message: err.message
+      });
       setIsSaving(false);
     }
   };
 
   // 7. (โค้ดเดิม) ฟังก์ชันคำนวณ "ส่วนต่าง" (สำหรับโหมด 2)
   const calculateDifference = (newActual) => {
-    // ... (โค้ดส่วนนี้เหมือนเดิม) ...
     const newYield = Number(newActual) || 0;
     setActualYield(newActual); 
     const oldYield = Number(previousYield) || 0;
@@ -181,7 +249,6 @@ export default function Summary() {
   
   // 8. (โค้ดเดิม) useEffect สำหรับโหมด 2 (บันทึกผลจริง)
   useEffect(() => {
-    // ... (โค้ดส่วนนี้เหมือนเดิม) ...
     if (!isPreview && results.actual_yield != null) {
       calculateDifference(results.actual_yield.toString());
       if (results.calc_date) {
@@ -197,7 +264,7 @@ export default function Summary() {
   // -----------------------------------------------------------------
   if (isPreview) {
     
-    // ( ... ตรรกะคำนวณ comparisonData ... เหมือนเดิม )
+    // ( ... ตรรกะคำนวณ comparisonData ... )
     let comparisonData = null;
     if (isComparisonMode) {
         const newEst = Number(results.estimated_yield) || 0;
@@ -215,15 +282,15 @@ export default function Summary() {
 
     return (
       <div className="flex flex-col min-h-screen bg-stone-50">
-        <Header />
+        <Navbar />
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
           
-          {/* ⭐️ (แก้ไข) เปลี่ยน onSubmit ให้เป็นแบบไดนามิก */}
-          {/* ถ้าเป็นโหมดเปรียบเทียบ (แก้ไข) -> ใช้ handleUpdateExisting (PUT) */}
-          {/* ถ้าเป็นการสร้างใหม่ -> ใช้ handleSaveNew (POST) */}
-          <form 
+          <motion.form 
             onSubmit={isComparisonMode ? handleUpdateExisting : handleSaveNew} 
             className="w-full max-w-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
           >
             <h1 className="text-3xl font-bold text-green-900 mb-2 text-center">
               สรุปผลการคำนวณ
@@ -234,7 +301,6 @@ export default function Summary() {
                 : "กรุณาตรวจสอบข้อมูลและกดยืนยันเพื่อบันทึก"}
             </p>
 
-            {/* ( ... โค้ดส่วนแสดงผลเปรียบเทียบ หรือแบบปกติ ... เหมือนเดิม ) */}
             {isComparisonMode ? (
               <>
                 {/* --- RENDER COMPARISON --- */}
@@ -274,7 +340,6 @@ export default function Summary() {
               </>
             )}
 
-            {/* ( ... โค้ดส่วน Card 2: ข้อมูลที่ใช้คำนวณ ... เหมือนเดิม ) */}
             <div className="bg-white shadow-xl rounded-2xl p-6 mb-8 text-left space-y-2">
               <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-2">
                 ข้อมูลที่ใช้ (รอบใหม่นี้)
@@ -293,7 +358,6 @@ export default function Summary() {
               </p>
             </div>
 
-            {/* ⭐️ (แก้ไข) เปลี่ยนข้อความปุ่มให้เป็นแบบไดนามิก */}
             <div className="mt-4 text-center flex flex-col items-center">
               <button
                 type="submit"
@@ -313,23 +377,37 @@ export default function Summary() {
               </button>
             </div>
             
-          </form>
+          </motion.form> 
         </main>
         <Footer />
+        
+        {/* ✅ 5. วาง Modal (สำหรับ Path นี้) */}
+        <AlertModal 
+          isOpen={modalState.isOpen}
+          onClose={handleModalClose}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+        />
       </div>
     );
   }
 
   // -----------------------------------------------------------------
   //   RENDER: โหมดที่ 2 - "บันทึกผลผลิตจริง" (PUT)
-  //   (ส่วนนี้ไม่เปลี่ยนแปลง - ยังทำงานเหมือนเดิม)
   // -----------------------------------------------------------------
   return (
     <div className="flex flex-col min-h-screen bg-stone-50">
-      <Header />
+      <Navbar />
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        {/* ( ... โค้ดส่วนนี้เหมือนเดิมทุกประการ ... ) */}
-        <form onSubmit={handleUpdateActual} className="w-full max-w-lg">
+        
+        <motion.form 
+          onSubmit={handleUpdateActual} 
+          className="w-full max-w-lg"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <h1 className="text-3xl font-bold text-green-900 mb-2 text-center">
             สรุปผลและบันทึกผล
           </h1>
@@ -405,9 +483,18 @@ export default function Summary() {
             </button>
           </div>
           
-        </form>
+        </motion.form>
       </main>
       <Footer />
+      
+      {/* ✅ 5. วาง Modal (สำหรับ Path นี้ด้วย) */}
+      <AlertModal 
+        isOpen={modalState.isOpen}
+        onClose={handleModalClose}
+        type={modalState.type}
+        title={modalState.title}
+        message={modalState.message}
+      />
     </div>
   );
 }

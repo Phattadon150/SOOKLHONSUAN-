@@ -1,7 +1,12 @@
+// FarmForm.jsx (ฉบับอัปเดต: Navbar + Animation + Modals)
+
 import { useState, useEffect } from "react"; 
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header"; 
+// import Header from "../components/Header"; // ❌ ลบ
+import Navbar from "../components/Navbar"; // ✅ เพิ่ม
 import Footer from "../components/Footer"; 
+import { motion } from "framer-motion"; // ✅ เพิ่ม
+import AlertModal from "../components/AlertModal"; // ✅ เพิ่ม
 
 export default function FarmForm() {
   const navigate = useNavigate();
@@ -10,7 +15,33 @@ export default function FarmForm() {
   const [cropTypesList, setCropTypesList] = useState([]); 
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- 🌟 2. เพิ่ม useEffect (ดึงข้อมูลพืชจาก API) ---
+  // ✅ 1. เพิ่ม State สำหรับ Modal (เหมือนหน้า Calculate)
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: '',
+    onCloseAction: null 
+  });
+
+  // ✅ 2. เพิ่มฟังก์ชันปิด Modal (เหมือนหน้า Calculate)
+  const handleModalClose = () => {
+    const action = modalState.onCloseAction;
+    
+    setModalState({ 
+      isOpen: false, 
+      type: 'success', 
+      title: '', 
+      message: '', 
+      onCloseAction: null 
+    });
+    
+    if (action) {
+      action(); 
+    }
+  };
+
+  // --- ( useEffect - ดึงข้อมูลพืชจาก API ) ---
   useEffect(() => {
     const fetchCropTypes = async () => {
       try {
@@ -25,28 +56,54 @@ export default function FarmForm() {
         
       } catch (error) {
         console.error("Fetch crop types error:", error);
-        alert("เกิดข้อผิดพลาดในการโหลดข้อมูลพืช: " + error.message);
+        
+        // ❌ alert("เกิดข้อผิดพลาดในการโหลดข้อมูลพืช: " + error.message);
+        // ✅ 3. เปลี่ยนเป็น Modal
+        setModalState({
+          isOpen: true,
+          type: 'error',
+          title: 'โหลดข้อมูลพืชไม่สำเร็จ',
+          message: error.message + ", กรุณาลองใหม่อีกครั้ง",
+          onCloseAction: () => navigate('/dashboard') // ถ้าโหลดพืชไม่ได้ ก็กลับ Dashboard
+        });
+
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCropTypes();
-  }, []);
+  }, [navigate]); // ⭐️ (เพิ่ม navigate เข้าไปใน dependency array)
 
   
-  // --- 🌟 3. แก้ไข handleSubmit (ส่งข้อมูลไป Backend) ---
+  // --- ( handleSubmit - ส่งข้อมูลไป Backend ) ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!farmName || !selectedCropId) {
-      alert("กรุณากรอกชื่อสวนและเลือกพืช");
+      // ❌ alert("กรุณากรอกชื่อสวนและเลือกพืช");
+      // ✅ 3. เปลี่ยนเป็น Modal
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'ข้อมูลไม่ครบถ้วน',
+        message: 'กรุณากรอกชื่อสวนและเลือกพืช',
+        onCloseAction: null
+      });
       return;
     }
 
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("ไม่พบข้อมูลผู้ใช้, กรุณาเข้าสู่ระบบใหม่");
-      navigate("/login");
+      // ❌ alert("ไม่พบข้อมูลผู้ใช้, กรุณาเข้าสู่ระบบใหม่");
+      // ❌ navigate("/login");
+      // ✅ 3. เปลี่ยนเป็น Modal
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'ไม่พบผู้ใช้',
+        message: 'ไม่พบข้อมูลผู้ใช้, กรุณาเข้าสู่ระบบใหม่',
+        onCloseAction: () => navigate('/login')
+      });
       return;
     }
     
@@ -65,36 +122,52 @@ export default function FarmForm() {
         body: JSON.stringify(payload)
       });
       
-      const data = await response.json(); // 👈 data ที่ได้กลับมาคือ { id: 1, name: '...', ... }
+      const data = await response.json(); 
 
       if (!response.ok) {
         throw new Error(data.error || "มีบางอย่างผิดพลาด");
       }
 
-      // --- 🌟 🌟 🌟 นี่คือจุดที่แก้ไข 🌟 🌟 🌟 ---
+      // ❌ alert("สร้างฟาร์มสำเร็จ! กำลังไปหน้าคำนวณผลผลิต...");
+      // ❌ navigate(`/farm/${data.id}/calculate`);
       
-      alert("สร้างฟาร์มสำเร็จ! กำลังไปหน้าคำนวณผลผลิต...");
-      
-      // (ข้อมูลฟาร์มใหม่จะอยู่ใน 'data'. เราจะใช้ 'data.id' เพื่อไปยังหน้า Calculate)
-      navigate(`/farm/${data.id}/calculate`); // 👈 ไปหน้า Calculate ของฟาร์มใหม่
-
-      // (ของเดิมคือ navigate("/dashboard");)
-      // --- 🌟 🌟 🌟 จบจุดที่แก้ไข 🌟 🌟 🌟 ---
+      // ✅ 3. เปลี่ยนเป็น Modal
+      setModalState({
+        isOpen: true,
+        type: 'success',
+        title: 'สร้างฟาร์มสำเร็จ!',
+        message: 'สร้างฟาร์มใหม่เรียบร้อย กำลังไปหน้าคำนวณผลผลิต...',
+        onCloseAction: () => navigate(`/farm/${data.id}/calculate`)
+      });
 
     } catch (error) {
       console.error("Create farm error:", error);
-      alert("เกิดข้อผิดพลาดในการสร้างฟาร์ม: " + error.message);
+      // ❌ alert("เกิดข้อผิดพลาดในการสร้างฟาร์ม: " + error.message);
+      // ✅ 3. เปลี่ยนเป็น Modal
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'สร้างฟาร์มไม่สำเร็จ',
+        message: error.message,
+        onCloseAction: null
+      });
     }
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header />
+      {/* <Header /> */}
+      <Navbar /> {/* ✅ เปลี่ยนเป็น Navbar */}
 
       <main className="flex-1 flex flex-col items-center justify-center px-4">
-        <form
+        
+        {/* ✅ 4. เปลี่ยน <form> เป็น <motion.form> และเพิ่ม animation */}
+        <motion.form
           onSubmit={handleSubmit}
           className="bg-white shadow-md rounded-xl p-6 w-full max-w-sm space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
         >
           <h1 className="text-center text-green-800 font-bold text-lg">
             กรอกชื่อสวน
@@ -136,10 +209,19 @@ export default function FarmForm() {
           >
             บันทึกสวน
           </button>
-        </form>
+        </motion.form>
       </main>
 
       <Footer />
+
+      {/* ✅ 5. เพิ่ม AlertModal ที่นี่ */}
+      <AlertModal 
+        isOpen={modalState.isOpen}
+        onClose={handleModalClose}
+        type={modalState.type}
+        title={modalState.title}
+        message={modalState.message}
+      />
     </div>
   );
 }

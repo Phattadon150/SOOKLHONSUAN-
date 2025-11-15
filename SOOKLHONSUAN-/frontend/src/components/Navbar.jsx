@@ -70,7 +70,7 @@ export default function Navbar() {
               <Link to="/valuesummary">มูลค่าสวน</Link>
               
               {/* ⭐️ (เพิ่ม) 3. เพิ่มลิงก์ "โปรไฟล์" */}
-              <Link to="/profile" className="text-green-800 hover:underline">
+              <Link to="/profilePage" className="text-green-800 hover:underline">
                 โปรไฟล์
               </Link>
               
