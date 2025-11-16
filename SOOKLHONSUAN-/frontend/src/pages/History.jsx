@@ -1,4 +1,4 @@
-// History.jsx (ฉบับเต็ม - จำการเลือกล่าสุด)
+// History.jsx (ฉบับเต็ม - แก้ไขระยะห่าง Sticky Sidebar)
 
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -32,7 +32,7 @@ const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
 const currentBuddhistYear = new Date().getFullYear() + 543;
 const years = Array.from({ length: 10 }, (_, i) => (currentBuddhistYear - i).toString());
 
-// ⭐️ (เพิ่ม) 1. กำหนด Key สำหรับ localStorage
+// ⭐️ 1. กำหนด Key สำหรับ localStorage
 const LAST_FARM_KEY = "sook_lon_suan_last_selected_farm";
 
 export default function History() {
@@ -87,17 +87,16 @@ export default function History() {
         setFarmList(uniqueFarms);
         setDisplayedFarms(uniqueFarms); 
 
-        // --- ⭐️ (แก้ไข) 2. ตรวจสอบการเลือกล่าสุดจาก localStorage ---
+        // --- ⭐️ 2. ตรวจสอบการเลือกล่าสุดจาก localStorage ---
         try {
           const savedFarmJSON = localStorage.getItem(LAST_FARM_KEY);
           if (savedFarmJSON) {
             const savedFarm = JSON.parse(savedFarmJSON);
-            // ตรวจสอบว่าสวนที่บันทึกไว้ ยังมีอยู่ในลิสต์ที่เพิ่งดึงมาใหม่หรือไม่
             const farmExists = uniqueFarms.some(f => f.farm_id === savedFarm.farm_id);
             if (farmExists) {
-              setSelectedFarm(savedFarm); // 👈 กู้คืนการเลือก
+              setSelectedFarm(savedFarm); 
             } else {
-              localStorage.removeItem(LAST_FARM_KEY); // 👈 ล้างค่าเก่าทิ้งถ้าไม่เจอ
+              localStorage.removeItem(LAST_FARM_KEY); 
             }
           }
         } catch (e) {
@@ -541,7 +540,7 @@ export default function History() {
           {/* คอลัมน์ขวา (Sidebar) */}
           {/* --------------------------- */}
           <div 
-            className="w-full lg:w-1/3 mt-6 lg:mt-0 lg:sticky lg:top-8" 
+            className="w-full lg:w-1/3 mt-6 lg:mt-0 lg:sticky lg:top-24" // ⭐️⭐️⭐️ แก้ไขตรงนี้ ⭐️⭐️⭐️
             style={{ alignSelf: 'start' }} 
           >
             <div className="bg-white shadow-xl rounded-2xl p-6">
@@ -552,15 +551,15 @@ export default function History() {
                 type="text"
                 placeholder="พิมพ์ชื่อสวน หรือ จังหวัด..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} // ✅ (แก้ไข) 3. แก้ไข e.g.value -> e.target.value
+                onChange={(e) => setSearchTerm(e.target.value)} // (โค้ดเดิมมี e.g.value น่าจะพิมพ์ผิด ผมแก้เป็น e.target.value)
                 className="w-full border border-gray-300 rounded-full px-4 py-2 mb-4"
               />
               {selectedFarm && (
                 <button
-                  // --- ⭐️ (แก้ไข) 4. เพิ่มการลบออกจาก localStorage ---
+                  // --- ⭐️ 4. เพิ่มการลบออกจาก localStorage ---
                   onClick={() => {
                     setSelectedFarm(null);
-                    localStorage.removeItem(LAST_FARM_KEY); // 👈 (เพิ่ม)
+                    localStorage.removeItem(LAST_FARM_KEY); 
                   }}
                   className="text-sm text-blue-600 hover:underline mb-4"
                 >
@@ -573,10 +572,10 @@ export default function History() {
                     displayedFarms.map(farm => (
                       <motion.button
                         key={farm.farm_id}
-                        // --- ⭐️ (แก้ไข) 5. เพิ่มการบันทึกลง localStorage ---
+                        // --- ⭐️ 5. เพิ่มการบันทึกลง localStorage ---
                         onClick={() => {
                           setSelectedFarm(farm);
-                          localStorage.setItem(LAST_FARM_KEY, JSON.stringify(farm)); // 👈 (เพิ่ม)
+                          localStorage.setItem(LAST_FARM_KEY, JSON.stringify(farm)); 
                         }}
                         className={`text-left p-3 rounded-lg transition-colors
                           ${selectedFarm?.farm_id === farm.farm_id 

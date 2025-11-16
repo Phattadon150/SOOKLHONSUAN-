@@ -1,4 +1,4 @@
-// Dashboard.jsx (ฉบับเต็ม - จำการเลือกล่าสุด + Toggle การเลือก)
+// Dashboard.jsx (ฉบับเต็ม - แก้ไขให้ส่งค่าไปหน้า History)
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,8 +11,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
-// ⭐️ (เพิ่ม) 1. กำหนด Key สำหรับ localStorage ของหน้า Dashboard
+// ⭐️ 1. กำหนด Key สำหรับ localStorage ของหน้า Dashboard
 const LAST_DASHBOARD_FARM_KEY = "sook_lon_suan_last_dashboard_farm";
+
+// ⭐️ (เพิ่มใหม่) 1B. Key สำหรับหน้า History (เพื่อให้หน้านี้ "ส่ง" ค่าไปได้)
+const LAST_HISTORY_FARM_KEY = "sook_lon_suan_last_selected_farm";
+
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -88,7 +92,7 @@ export default function Dashboard() {
         setAllFarms(groupedFarms);
         setDisplayedFarms(groupedFarms);
 
-        // --- ⭐️ (เพิ่ม) 2. ตรวจสอบการเลือกล่าสุดจาก localStorage ---
+        // --- ⭐️ 2. ตรวจสอบการเลือกล่าสุดจาก localStorage ---
         try {
           const savedFarmId = localStorage.getItem(LAST_DASHBOARD_FARM_KEY);
           if (savedFarmId) {
@@ -203,7 +207,7 @@ export default function Dashboard() {
   const executeDelete = async () => {
     const farmId = confirmModal.farmId;
     
-    // --- ⭐️ (แก้ไข) 3. ลบออกจาก localStorage ถ้าสวนที่ถูกลบคือสวนที่เลือกไว้ ---
+    // --- ⭐️ 3. ลบออกจาก localStorage ถ้าสวนที่ถูกลบคือสวนที่เลือกไว้ ---
     if (farmId.toString() === selectedFarmIdForGraph) {
       setSelectedFarmIdForGraph("");
       localStorage.removeItem(LAST_DASHBOARD_FARM_KEY); // 👈 (เพิ่ม)
@@ -235,7 +239,7 @@ export default function Dashboard() {
     }
   };
 
-  // ( ... ฟังก์ชัน handleAddNewCalculation, handleViewHistory ... เหมือนเดิม)
+  // ( ... ฟังก์ชัน handleAddNewCalculation ... เหมือนเดิม)
   const handleAddNewCalculation = (farmId) => {
     const latestCalc = allCalculations
       .filter(c => c.farm_id === farmId)
@@ -254,7 +258,27 @@ export default function Dashboard() {
       state: { preloadData }
     });
   };
-  const handleViewHistory = (farmId) => { navigate("/history"); };
+
+  // ⭐️ (แก้ไขฟังก์ชันนี้) ⭐️
+  const handleViewHistory = (farmId) => {
+    // 1. ค้นหาข้อมูลฟาร์มทั้งหมดจาก allFarms
+    const farmToSelect = allFarms.find(f => f.farm_id === farmId);
+    
+    if (farmToSelect) {
+      try {
+        // 2. บันทึกข้อมูลฟาร์มที่เลือก (แบบเดียวกับที่ History.jsx ทำ)
+        // โดยใช้ Key ที่ตรงกับที่หน้า History.jsx ใช้
+        localStorage.setItem(LAST_HISTORY_FARM_KEY, JSON.stringify(farmToSelect));
+      } catch (e) {
+        console.error("Failed to save farm to localStorage for history page", e);
+      }
+    }
+    
+    // 3. นำทางไปยังหน้าประวัติ
+    navigate("/history");
+  };
+  // ⭐️ (สิ้นสุดการแก้ไข) ⭐️
+
   const handleCloseModal = () => setModal({ ...modal, isOpen: false });
   const handleCloseConfirmModal = () => setConfirmModal({ ...confirmModal, isOpen: false });
 
@@ -292,7 +316,7 @@ export default function Dashboard() {
               {graphTitle}
             </h2>
             {selectedFarmIdForGraph && (
-              // --- ⭐️ (แก้ไข) 4. เพิ่มการลบออกจาก localStorage ที่ปุ่ม "ล้างการเลือก" ---
+              // --- ⭐️ 4. เพิ่มการลบออกจาก localStorage ที่ปุ่ม "ล้างการเลือก" ---
               <button
                 onClick={() => {
                   setSelectedFarmIdForGraph("");
@@ -391,7 +415,7 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* --- ⭐️ (แก้ไข) Grid แสดง FarmCard (อัปเดต onClick) --- */}
+        {/* --- ⭐️ Grid แสดง FarmCard (อัปเดต onClick ... เหมือนเดิม) --- */}
         {isLoading ? (
           <p>กำลังโหลดข้อมูลสวน...</p>
         ) : error ? (
