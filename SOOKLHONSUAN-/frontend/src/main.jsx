@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 // ⭐️ 1. (แก้ไข) อัปเดต Path ให้ชี้ไปที่โฟลเดอร์ src/
-import App from "C:/react-app/SOOKLHONSUAN-/SOOKLHONSUAN-/frontend/src/App.jsx"; 
-import "C:/react-app/SOOKLHONSUAN-/SOOKLHONSUAN-/frontend/src/index.css";
+import App from "../src/App"; 
+import "../src/index.css";
 
 // ⭐️ 2. Import Provider
 import { GoogleOAuthProvider } from "@react-oauth/google";
