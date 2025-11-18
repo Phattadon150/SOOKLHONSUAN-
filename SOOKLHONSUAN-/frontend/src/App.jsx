@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 // ⭐️ แก้ไข: เพิ่ม .jsx ต่อท้าย path
+import OCRPage from "./pages/OCRPage.jsx";
 import Landing from "./pages/Landing.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Login from "./pages/Login.jsx";
@@ -11,6 +12,7 @@ import ValueSummary from "./pages/ValueSummary.jsx";
 import Calculate from "./pages/Calculate.jsx";
 import ProductDetail from "./pages/ProductDetail.jsx"; 
 import CompleteGoogleSignup from "./pages/CompleteGoogleSignup.jsx"; 
+
 
 // ⭐️ Component "ด่านตรวจ" (ProtectedRoute)
 // (เก็บไว้ใน App.jsx หรือย้ายไปไฟล์แยกก็ได้ครับ)
@@ -43,6 +45,10 @@ export default function App() {
         element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
       />
       <Route 
+        path="/ocr" 
+        element={<ProtectedRoute><OCRPage /></ProtectedRoute>} 
+      />
+      <Route 
         path="/farmform" 
         element={<ProtectedRoute><FarmForm /></ProtectedRoute>} 
       />
@@ -72,5 +78,6 @@ export default function App() {
       {/* ถ้าเข้า Path มั่ว, กลับไปหน้าแรก */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    
   );
 }
