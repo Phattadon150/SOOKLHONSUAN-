@@ -19,7 +19,7 @@ const OCRComponent = () => {
             setSelectedFile(null);
             setImagePreviewUrl('');
             setOcrResult('กรุณาเลือกไฟล์รูปภาพ (jpg, png) ที่ถูกต้อง');
-            setError('❌ ไฟล์ที่เลือกไม่ใช่รูปภาพที่ถูกต้อง');
+            setError('ไฟล์ที่เลือกไม่ใช่รูปภาพที่ถูกต้อง');
         }
     };
 
@@ -45,13 +45,13 @@ const OCRComponent = () => {
 
     const runOCR = useCallback(async () => {
         if (!selectedFile) {
-            setError('⚠️ กรุณาเลือกรูปภาพก่อนทำการสแกน');
+            setError('กรุณาเลือกรูปภาพก่อนทำการสแกน');
             return;
         }
 
         setIsLoading(true);
         setError('');
-        setOcrResult('⏳ กำลังประมวลผล OCR... กรุณารอสักครู่');
+        setOcrResult('กำลังประมวลผล OCR... กรุณารอสักครู่');
 
         try {
             await new Promise(resolve => setTimeout(resolve, 3000)); 
@@ -70,7 +70,7 @@ const OCRComponent = () => {
             setOcrResult(dummyResponseText);
             
         } catch (err) {
-            setError('❌ เกิดข้อผิดพลาดในการประมวลผล OCR');
+            setError('เกิดข้อผิดพลาดในการประมวลผล OCR');
             setOcrResult('ไม่สามารถแปลงรูปภาพเป็นข้อความได้');
         } finally {
             setIsLoading(false);
@@ -85,9 +85,9 @@ const OCRComponent = () => {
         tempTextarea.select();
         try {
             document.execCommand('copy');
-            setError('✅ คัดลอกข้อความแล้ว!');
+            setError(' คัดลอกข้อความแล้ว!');
         } catch (err) {
-            setError('❌ ไม่สามารถคัดลอกได้');
+            setError('ไม่สามารถคัดลอกได้');
         }
         document.body.removeChild(tempTextarea);
         setTimeout(() => setError(''), 2000);
@@ -145,7 +145,7 @@ const OCRComponent = () => {
                         />
                         <svg className={`w-8 h-8 ${isDragging ? 'text-emerald-700' : 'text-emerald-500'} transition-colors`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         <p className="text-lg font-bold text-gray-700 mt-2">
-                            {isDragging ? '📂 ปล่อยไฟล์เพื่ออัปโหลด' : 'ลากไฟล์มาวาง หรือคลิกที่นี่'}
+                            {isDragging ? ' ปล่อยไฟล์เพื่ออัปโหลด' : 'ลากไฟล์มาวาง หรือคลิกที่นี่'}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">รองรับ JPG, PNG, PDF (สูงสุด 5MB)</p>
                     </div>
@@ -182,7 +182,7 @@ const OCRComponent = () => {
                                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                 กำลังสแกน...
                             </span>
-                        ) : '🔍 สแกนและแปลงเป็นข้อความ'}
+                        ) : ' สแกนและแปลงเป็นข้อความ'}
                     </button>
                 </div>
 
@@ -213,7 +213,7 @@ const OCRComponent = () => {
                                 : 'bg-lime-500 text-gray-900 hover:bg-lime-600 transform hover:scale-[1.01] active:scale-[0.99] shadow-lime-400/50'}
                         `}
                     >
-                        📋 คัดลอกข้อความ
+                         คัดลอกข้อความ
                     </button>
                 </div>
             </div>
