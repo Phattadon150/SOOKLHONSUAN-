@@ -1,0 +1,370 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-th  e-docs {
+  color: #888;
+}
+/* ocr.css */
+
+.ocr-container {
+    padding: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+    font-family: sans-serif;
+}
+
+.subtitle {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.ocr-layout {
+    display: flex;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.image-section, .result-section {
+    flex: 1;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* INPUT FILE STYLING */
+.file-input {
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    position: absolute;
+    z-index: -1;
+}
+
+.custom-file-upload {
+    display: block;
+    cursor: pointer;
+    background-color: #f0f0f0;
+    color: #333;
+    padding: 10px 15px;
+    border-radius: 4px;
+    text-align: center;
+    margin-bottom: 15px;
+    border: 1px dashed #ccc;
+    transition: background-color 0.2s;
+}
+
+.custom-file-upload:hover {
+    background-color: #e0e0e0;
+}
+
+/* BUTTONS */
+.scan-button, .copy-button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.scan-button {
+    background-color: #007bff;
+    color: white;
+}
+
+.scan-button:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+.scan-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.scan-button.loading {
+    background-color: #ffc107; /* สีเหลืองขณะโหลด */
+}
+
+.copy-button {
+    background-color: #28a745;
+    color: white;
+    margin-top: 10px;
+}
+
+.copy-button:hover:not(:disabled) {
+    background-color: #1e7e34;
+}
+
+/* IMAGE PREVIEW */
+.image-preview-box {
+    margin-top: 20px;
+    max-height: 400px; /* จำกัดความสูง */
+    overflow: hidden;
+    text-align: center;
+    border: 1px solid #eee;
+}
+
+.preview-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+/* RESULT TEXTAREA */
+.result-textarea {
+    width: 100%;
+    height: 350px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* MESSAGES */
+.error-message {
+    color: red;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+/* --- โค้ด CSS พื้นฐานของโปรเจกต์ของคุณ (จำลอง) --- */
+
+#root {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f9;
+}
+/* ... โค้ดอื่นๆ เช่น .logo, .card, etc. ... */
+
+/* --- สไตล์สำหรับ OCR Component ที่ได้รับการปรับปรุง --- */
+
+.ocr-container {
+    padding: 40px 20px;
+    max-width: 1200px;
+    margin: 30px auto;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    text-align: left; 
+}
+
+.ocr-container h1 {
+    color: #007bff;
+    font-size: 2.2em;
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: #6c757d;
+    font-size: 1.1em;
+    margin-bottom: 25px;
+}
+
+.ocr-layout {
+    display: flex;
+    gap: 30px;
+    margin-top: 30px;
+}
+
+.image-section, .result-section {
+    flex: 1;
+    padding: 20px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease;
+}
+
+.image-section:hover, .result-section:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .ocr-layout {
+        flex-direction: column; /* จัดเรียงซ้อนกันบนมือถือ */
+    }
+}
+
+/* INPUT FILE STYLING */
+.file-input {
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    position: absolute;
+    z-index: -1;
+}
+
+.custom-file-upload {
+    display: block;
+    cursor: pointer;
+    background-color: #e9ecef;
+    color: #333;
+    padding: 12px 15px;
+    border-radius: 6px;
+    text-align: center;
+    margin-bottom: 15px;
+    border: 2px dashed #ced4da;
+    transition: background-color 0.2s, border-color 0.2s;
+    font-weight: 500;
+}
+
+.custom-file-upload:hover {
+    background-color: #dee2e6;
+    border-color: #adb5bd;
+}
+
+/* BUTTONS */
+.scan-button, .copy-button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-bottom: 10px;
+    transition: background-color 0.3s, box-shadow 0.3s, transform 0.1s;
+}
+
+.scan-button {
+    background-color: #007bff;
+    color: white;
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
+}
+
+.scan-button:hover:not(:disabled) {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.scan-button:disabled {
+    background-color: #adb5bd;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* --- Loading Animation --- */
+@keyframes pulse-scan {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.01); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.scan-button.loading {
+    background-color: #ffc107; /* สีเหลืองขณะโหลด */
+    color: #343a40;
+    animation: pulse-scan 1s infinite ease-in-out;
+}
+
+.copy-button {
+    background-color: #28a745;
+    color: white;
+    box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+    margin-top: 15px;
+}
+
+.copy-button:hover:not(:disabled) {
+    background-color: #1e7e34;
+    transform: translateY(-1px);
+}
+
+/* IMAGE PREVIEW */
+.image-preview-box {
+    margin-top: 20px;
+    max-height: 400px; 
+    overflow: hidden;
+    text-align: center;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background-color: #fff;
+    padding: 5px;
+}
+
+.preview-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+}
+
+/* RESULT TEXTAREA */
+.result-textarea {
+    width: 100%;
+    height: 350px;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    resize: vertical;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    background-color: #ffffff;
+}
+
+.result-textarea:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+/* MESSAGES */
+.error-message {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 10px;
+    font-weight: bold;
+}
