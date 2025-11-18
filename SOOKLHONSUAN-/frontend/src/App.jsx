@@ -1,33 +1,75 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Landing from "./pages/Landing";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import FarmForm from "./pages/FarmForm";
-import Summary from "./pages/Summary";
-import History from "./pages/History";
-import ValueSummary from "./pages/ValueSummary";
-import Calculate from "./pages/Calculate";
-import Ocr from "./pages/Ocr";
+// ⭐️ แก้ไข: เพิ่ม .jsx ต่อท้าย path
+import Landing from "./pages/Landing.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import FarmForm from "./pages/FarmForm.jsx";
+import Summary from "./pages/Summary.jsx";
+import History from "./pages/History.jsx";
+import ValueSummary from "./pages/ValueSummary.jsx";
+import Calculate from "./pages/Calculate.jsx";
+import ProductDetail from "./pages/ProductDetail.jsx"; 
+import CompleteGoogleSignup from "./pages/CompleteGoogleSignup.jsx"; 
+
+// ⭐️ Component "ด่านตรวจ" (ProtectedRoute)
+// (เก็บไว้ใน App.jsx หรือย้ายไปไฟล์แยกก็ได้ครับ)
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    // ถ้าไม่มี Token, เด้งไปหน้า Login
+    return <Navigate to="/login" replace />;
+  }
+  return children; // ถ้ามี Token, แสดงหน้าที่ร้องขอ
+};
 
 export default function App() {
   return (
     <Routes>
-      {/* ✅ หน้าแรก (Landing Page) */}
+      {/* Routes สาธารณะ */}
       <Route path="/" element={<Landing />} />
-
-      {/* ✅ หน้าหลัก */}
-      <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/farmform" element={<FarmForm />} />
-      <Route path="/summary" element={<Summary />} />
-      <Route path="/history" element={<History />} />
-      <Route path="/valuesummary" element={<ValueSummary />} />
-      <Route path="/calculate" element={<Calculate />} />
-      <Route path="/Ocr" element={<Ocr />} />
+      
+      {/* ⭐️ 2. (ใหม่) เพิ่ม Route สำหรับหน้ายืนยัน Google (เป็น Public) */}
+      <Route 
+        path="/complete-google-signup" 
+        element={<CompleteGoogleSignup />} 
+      />
 
-      {/* ✅ fallback ถ้า route ไม่เจอ → กลับหน้า Landing */}
+      {/* ⭐️ Routes ที่ต้อง Login (หุ้มด้วย ProtectedRoute) */}
+      <Route 
+        path="/dashboard" 
+        element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+      />
+      <Route 
+        path="/farmform" 
+        element={<ProtectedRoute><FarmForm /></ProtectedRoute>} 
+      />
+      <Route 
+        path="/history" 
+        element={<ProtectedRoute><History /></ProtectedRoute>} 
+      />
+      <Route 
+        path="/valuesummary" 
+        element={<ProtectedRoute><ValueSummary /></ProtectedRoute>} 
+      />
+      <Route 
+        path="/product/:crop" 
+        element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} 
+      />
+
+      {/* Routes ที่ต้อง Login และมี farmId */}
+      <Route 
+        path="/farm/:farmId/calculate" 
+        element={<ProtectedRoute><Calculate /></ProtectedRoute>} 
+      />
+      <Route 
+        path="/farm/:farmId/summary" 
+        element={<ProtectedRoute><Summary /></ProtectedRoute>} 
+      />
+
+      {/* ถ้าเข้า Path มั่ว, กลับไปหน้าแรก */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

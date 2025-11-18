@@ -11,17 +11,17 @@ const normalizeUsername = (u) => (u || '').trim().toLowerCase();
 const isValidUsername = (u) => /^[a-z0-9_\.]{3,20}$/.test(u || '');
 
 const register = async (req, res) => {
-  let { firstname, lastname, email,username, password, plan_type } = req.body || {};
+  let { firstname, lastname, email, username, password, plan_type } = req.body || {};
   firstname = (firstname || '').trim();
-  lastname  = (lastname  || '').trim();
-  email     = normalizeEmail(email);
-  username  = normalizeUsername(username);
+  lastname = (lastname || '').trim();
+  email = normalizeEmail(email);
+  username = normalizeUsername(username);
   plan_type = isValidPlan(plan_type) ? plan_type.toLowerCase() : 'free';
 
-  if (!firstname || !lastname || !email ||!username || !password) {
+  if (!firstname || !lastname || !email || !username || !password) {
     return res.status(400).json({ error: 'firstname, lastname, email, username, password are required' });
   }
-   if (!/^[a-z0-9_\.]{3,20}$/.test(username)) {
+  if (!/^[a-z0-9_\.]{3,20}$/.test(username)) {
     return res.status(400).json({ error: 'username must be 3-20 chars, a-z0-9._ only' });
   }
   if (password.length < 8) {
@@ -30,9 +30,9 @@ const register = async (req, res) => {
 
   try {
     // เช็คซ้ำ
-    const exist = await pool.query('SELECT 1 FROM users WHERE email = $1 OR username = $2' , 
-    [email, username]
-  );
+    const exist = await pool.query('SELECT 1 FROM users WHERE email = $1 OR username = $2',
+      [email, username]
+    );
     if (exist.rows.length) {
       return res.status(400).json({ error: 'Email already exists' });
     }
@@ -75,7 +75,8 @@ const login = async (req, res) => {
       return res.status(500).json({ error: 'JWT secret not configured' });
     }
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
     res.json({
       token,
       user: {
@@ -94,7 +95,8 @@ const login = async (req, res) => {
 
 const getMe = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
+
     const { rows } = await pool.query(
       'SELECT id, firstname, lastname, email, username, plan_type, created_at FROM users WHERE id = $1',
       [userId]
@@ -183,9 +185,9 @@ const googleLogin = async (req, res) => {
         const updated = await pool.query('SELECT * FROM users WHERE id = $1', [user.id]);
         user = updated.rows[0];
       } catch (_) {
-      } 
+      }
 
-      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
       return res.json({
         token,
         user: {
@@ -255,33 +257,33 @@ const googleCompleteSignup = async (req, res) => {
       return res.status(409).json({ error: 'Email or username already exists' });
     }
 
-const dummyPassword = await bcrypt.hash('google-' + googleId, 10);
+    const dummyPassword = await bcrypt.hash('google-' + googleId, 10);
 
-const insert = await pool.query(
-  `INSERT INTO users (
-     firstname, lastname, email, username,
-     password,
-     google_id, provider, picture, email_verified, plan_type
-   )
-   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-   RETURNING id, firstname, lastname, email, username, plan_type, picture`,
-  [
-    (firstname || '').trim(),
-    (lastname  || '').trim(),
-    email,
-    username,
-    dummyPassword,
-    googleId,
-    'google',
-    picture,
-    emailVerified,
-    plan_type
-  ]
-);
-
+    const insert = await pool.query(
+      `INSERT INTO users (
+         firstname, lastname, email, username,
+         password,
+         google_id, provider, picture, email_verified, plan_type
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id, firstname, lastname, email, username, plan_type, picture`,
+      [
+        (firstname || '').trim(),
+        (lastname || '').trim(),
+        email,
+        username,
+        dummyPassword,
+        googleId,
+        'google',
+        picture,
+        emailVerified,
+        plan_type
+      ]
+    );
 
     const user = insert.rows[0];
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     return res.status(201).json({
       token,

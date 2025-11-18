@@ -1,16 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const pool = require('../backend/src/db');
+
+const pool = require('./src/db'); 
+const auth = require('./src/middleware/auth'); 
 
 const app = express();
-
-app.use(cors({
-  origin: [
-    'http://localhost:5713'
-  ]
-}));
 app.use(express.json());
+
+const corsOptions = {
+  origin: 'http://localhost:5173' 
+};
+app.use(cors(corsOptions)); 
 
 app.get('/testdb', async (req, res) => {
   try {
@@ -29,10 +30,10 @@ const calculationRoutes = require('./src/routes/calculations');
 const marketPriceRoutes = require('./src/routes/marketPrices');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/farms', farmRoutes);
+app.use('/api/farms', auth, farmRoutes);
 app.use('/api/crop-types', cropTypeRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/calculations', calculationRoutes);
+app.use('/api/users', auth, userRoutes);
+app.use('/api/calculations', auth,calculationRoutes);
 app.use('/api/market-prices', marketPriceRoutes);
 
 module.exports = app;
