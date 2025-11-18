@@ -44,10 +44,19 @@ export default function App() {
         path="/dashboard" 
         element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
       />
-      <Route 
-        path="/ocr" 
-        element={<ProtectedRoute><OCRPage /></ProtectedRoute>} 
-      />
+      <Route path="/" element={<Landing />} />
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+
+  {/* ⭐ เปิดหน้า OCR แบบไม่ต้อง login */}
+  <Route path="/ocr" element={<OCRPage />} />
+
+  {/* Routes ที่ต้อง Login */}
+  <Route 
+    path="/dashboard" 
+    element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+  />
+
       <Route 
         path="/farmform" 
         element={<ProtectedRoute><FarmForm /></ProtectedRoute>} 

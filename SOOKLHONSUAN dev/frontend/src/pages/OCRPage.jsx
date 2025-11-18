@@ -1,169 +1,177 @@
-// src/pages/OCRPage.jsx
-
-import { useState, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { uploadImage } from "../lib/ocr/upload"; // ⭐ ใช้ API จริงของคุณ
+import { uploadImage } from "../lib/ocr/upload";
 
 export default function OCRPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [ocrResult, setOcrResult] = useState("ผลลัพธ์ข้อความที่สแกนจะปรากฏที่นี่...");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
+  const [cameraOn, setCameraOn] = useState(false);
 
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  // 🔥 START CAMERA (เวอร์ชันที่ใช้ได้จริง)
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+
+      if (!videoRef.current) {
+        console.log("VIDEO ยังไม่พร้อม");
+        return;
+      }
+
+      videoRef.current.srcObject = stream;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current.play();
+      };
+
+      setCameraOn(true);
+    } catch (err) {
+      alert("เปิดกล้องไม่ได้: " + err.message);
+    }
+  };
+
+  // 🔥 CAPTURE PHOTO
+  const capturePhoto = async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (!video) return alert("กล้องยังไม่พร้อม");
+
+    // รอเฟรมแรก (มือถือจำเป็นมาก)
+    await new Promise((res) => requestAnimationFrame(res));
+
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.95)
+    );
+
+    if (!blob) return alert("ถ่ายภาพไม่สำเร็จ");
+
+    const file = new File([blob], "camera.jpg", { type: "image/jpeg" });
+
+    setSelectedFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+
+    // ปิด stream
+    const stream = video.srcObject;
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    setCameraOn(false);
+  };
+
+  // 🔥 RUN OCR
+  const runOCR = async () => {
+    if (!selectedFile) return alert("กรุณาเลือกรูปหรือถ่ายรูปก่อน");
+
+    setIsLoading(true);
+
+    const res = await uploadImage(selectedFile);
+    setOcrResult(res.markdown || res.text || JSON.stringify(res, null, 2));
+
+    setIsLoading(false);
+  };
+
+  // 📤 Process File from gallery
   const processFile = (file) => {
     if (file && file.type.startsWith("image/")) {
       setSelectedFile(file);
       setImagePreviewUrl(URL.createObjectURL(file));
-      setOcrResult("กดปุ่ม 'สแกน' เพื่อเริ่มประมวลผล...");
-      setError("");
-    } else {
-      setSelectedFile(null);
-      setImagePreviewUrl("");
-      setOcrResult("กรุณาเลือกรูปภาพที่ถูกต้อง");
-      setError("ไฟล์ไม่ใช่รูปภาพ");
+      setOcrResult("กดปุ่มสแกนเพื่อเริ่มประมวลผล...");
     }
-  };
-
-  const handleFileChange = useCallback((event) => {
-    processFile(event.target.files[0]);
-  }, []);
-
-  const handleDrop = useCallback((event) => {
-    event.preventDefault();
-    setIsDragging(false);
-    const file = event.dataTransfer.files[0];
-    processFile(file);
-  }, []);
-
-  const handleDragOver = useCallback((event) => {
-    event.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const runOCR = useCallback(async () => {
-    if (!selectedFile) {
-      setError("กรุณาเลือกรูปภาพก่อนทำการสแกน");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError("");
-      setOcrResult("กำลังประมวลผล OCR...");
-
-      // ⭐ OCR จริง
-      const result = await uploadImage(selectedFile);
-      setOcrResult(result.markdown || result.text || "ไม่พบข้อความ");
-
-    } catch (err) {
-      setError("เกิดข้อผิดพลาดในการประมวลผล OCR");
-      setOcrResult("OCR Error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedFile]);
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(ocrResult);
-    setError("คัดลอกแล้ว!");
-    setTimeout(() => setError(""), 1500);
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="bg-gray-50 min-h-screen">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
-        <h1 className="text-3xl font-bold text-green-900 mb-6">
-          📄 สแกนภาพเพื่อแปลงเป็นข้อความ
+      <div className="max-w-6xl mx-auto p-8 bg-white mt-10 rounded-3xl shadow-xl">
+        <h1 className="text-3xl font-bold text-green-900 mb-6 text-center">
+          สแกนภาพเพื่อแปลงเป็นข้อความ (OCR)
         </h1>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-xl">
-            {error}
-          </div>
-        )}
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* LEFT */}
+          <div className="lg:w-2/5 space-y-5">
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 bg-white p-8 rounded-2xl shadow-md">
+            {/* File Upload */}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => processFile(e.target.files[0])}
+              className="border p-3 rounded-xl w-full cursor-pointer"
+            />
 
-          {/* LEFT: Upload + Preview */}
-          <div className="space-y-5">
-
-            <h2 className="text-lg font-semibold text-green-800">
-              อัปโหลดรูปภาพ หรือ ลากมาวาง
-            </h2>
-
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              className={`border-2 border-dashed rounded-xl h-48 flex flex-col justify-center items-center cursor-pointer transition 
-                ${isDragging ? "border-green-700 bg-green-50" : "border-gray-300 bg-gray-100 hover:bg-gray-200"}
-              `}
-              onClick={() => document.getElementById("upload").click()}
-            >
-              <input
-                id="upload"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-
-              <p className="font-semibold text-gray-700">
-                {isDragging ? "ปล่อยไฟล์เพื่ออัปโหลด" : "ลากไฟล์มาวาง หรือคลิกเพื่อเลือก"}
-              </p>
-              <p className="text-sm text-gray-500">รองรับ JPG, PNG สูงสุด 5MB</p>
-            </div>
-
-            {/* Preview */}
-            {imagePreviewUrl && (
-              <div className="p-3 bg-gray-100 rounded-xl border border-gray-300 max-h-80 overflow-y-auto">
-                <img src={imagePreviewUrl} className="rounded-lg shadow" />
-              </div>
+            {/* Camera Button */}
+            {!cameraOn && (
+              <button
+                onClick={startCamera}
+                className="w-full bg-green-700 text-white py-3 rounded-xl font-bold hover:bg-green-800"
+              >
+                📸 เปิดกล้อง
+              </button>
             )}
 
+            {/* Video ALWAYS rendered */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`rounded-xl w-full bg-black ${cameraOn ? "" : "hidden"}`}
+            />
+
+            <canvas ref={canvasRef} className="hidden"></canvas>
+
+            {cameraOn && (
+              <button
+                onClick={capturePhoto}
+                className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600"
+              >
+                ✔ ถ่ายรูป & ใช้ภาพนี้
+              </button>
+            )}
+
+            {/* Image Preview */}
+            {imagePreviewUrl && (
+              <img
+                src={imagePreviewUrl}
+                className="rounded-xl shadow-lg border"
+                alt="preview"
+              />
+            )}
+
+            {/* OCR Button */}
             <button
               onClick={runOCR}
               disabled={!selectedFile || isLoading}
-              className={`w-full py-3 rounded-xl text-white font-bold shadow-md transition ${
-                !selectedFile || isLoading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
+              className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-800 disabled:bg-gray-400"
             >
               {isLoading ? "กำลังสแกน..." : "สแกนและแปลงเป็นข้อความ"}
             </button>
           </div>
 
-          {/* RIGHT: OCR Result */}
-          <div className="space-y-5">
-            <h2 className="text-lg font-semibold text-green-800">ผลลัพธ์</h2>
-
+          {/* RIGHT */}
+          <div className="lg:w-3/5">
+            <h2 className="text-xl font-bold text-green-900 mb-2">ผลลัพธ์</h2>
             <textarea
               value={ocrResult}
               readOnly
-              className="w-full h-96 p-4 bg-gray-100 border border-gray-300 rounded-xl resize-none shadow-inner"
-            />
-
-            <button
-              onClick={copyToClipboard}
-              disabled={ocrResult.startsWith("ผลลัพธ์") || isLoading}
-              className="w-full py-3 bg-lime-500 hover:bg-lime-600 text-green-900 font-bold rounded-xl shadow"
-            >
-              คัดลอกข้อความ
-            </button>
+              className="w-full h-[420px] border p-4 rounded-xl bg-gray-50 shadow-inner"
+            ></textarea>
           </div>
-
         </div>
-      </main>
+      </div>
 
       <Footer />
     </div>
