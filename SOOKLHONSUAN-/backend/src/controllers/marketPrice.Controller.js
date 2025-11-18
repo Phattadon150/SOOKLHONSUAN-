@@ -5,6 +5,51 @@ function normalizeProvince(p) {
   return String(p).trim();
 }
 
+const GRADE_CONFIG_BY_CROP = {
+  // 1 = ลำไย
+  1: [
+    { key: 'AA+A', label: 'AA+A', percentage: 0.20, price: 40 },
+    { key: 'AA',   label: 'AA',   percentage: 0.20, price: 26 },
+    { key: 'A',    label: 'A',    percentage: 0.20, price: 10 },
+    { key: 'B',    label: 'B',    percentage: 0.20, price: 6  },
+    { key: 'C',    label: 'C',    percentage: 0.20, price: 1  }
+  ],
+
+};
+
+function calculateGradeRevenue(totalKg, crop_type_id) {
+  const total = Number(totalKg || 0);
+  const cid = Number(crop_type_id || 1);
+
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  const config = GRADE_CONFIG_BY_CROP[cid];
+  if (!config) return null;
+
+  const grades = {};
+  let sum = 0;
+
+  for (const g of config) {
+    const kg = +(total * g.percentage).toFixed(2);
+    const revenue = +(kg * g.price).toFixed(2);
+
+    grades[g.key] = {
+      label: g.label,
+      kg,
+      price_per_kg: g.price,
+      revenue
+    };
+
+    sum += revenue;
+  }
+
+  return {
+    total_yield_kg: total,
+    grades,
+    total_revenue: +sum.toFixed(2)
+  };
+}
+
 // ดึงราคากลางล่าสุดจากตาราง market_prices
 async function fetchLatestCentralPrice({ crop_type_id, province }) {
   const cid = Number(crop_type_id || 1);
@@ -105,6 +150,8 @@ const estimateValue = async (req, res) => {
       const usedPrice = central.price_avg;
       const totalValue = est * usedPrice;
 
+      const gradeRevenue = calculateGradeRevenue(est, crop_type_id);
+
       return res.json({
         mode: 'market',
         crop_type_id: crop_type_id ? Number(crop_type_id) : 1,
@@ -113,6 +160,7 @@ const estimateValue = async (req, res) => {
         used_price: usedPrice,
         unit: central.unit,
         total_value: totalValue,
+        grade_revenue: gradeRevenue,
         central_price: central,
         source: central.source
       });
@@ -124,27 +172,17 @@ const estimateValue = async (req, res) => {
       return res.status(400).json({ error: 'custom_price must be > 0 when mode="custom"' });
     }
 
-    const totalValue = est * cp;
-
-    let diffFromCentral = null;
-    let centralAvg = null;
-    if (central && typeof central.price_avg === 'number') {
-      centralAvg = central.price_avg;
-      diffFromCentral = cp - centralAvg; // + = สูงกว่าราคากลาง, - = ต่ำกว่า
-    }
+    const flatTotalValue = +(est * cp).toFixed(2);
 
     return res.json({
       mode: 'custom',
       crop_type_id: crop_type_id ? Number(crop_type_id) : 1,
       province: normalizeProvince(province),
-      estimated_yield: est,
-      used_price: cp,
-      unit: central?.unit || 'THB/kg',
-      total_value: totalValue,
-      central_price_avg: centralAvg,
-      diff_from_central: diffFromCentral,
-      central_price: central
+      total_yield_kg: est,
+      price_per_kg: cp,
+      total_value: flatTotalValue,
     });
+
   } catch (err) {
     console.error('estimateValue error:', err);
     res.status(500).json({ error: err.message });
