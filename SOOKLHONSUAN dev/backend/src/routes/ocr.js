@@ -1,4 +1,3 @@
-// ./src/routes/ocr.js
 const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
@@ -8,94 +7,149 @@ require("dotenv").config();
 
 const upload = multer({ dest: "uploads/" });
 
-// ===================== RETRY + FALLBACK ENGINE =====================
-async function callGemini(model, body, retry = 3) {
-  for (let i = 0; i < retry; i++) {
-    try {
-      return await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
-        body,
-        { timeout: 20000 }
-      );
-    } catch (err) {
-      const overload =
-        err.response?.status === 503 ||
-        err.response?.status === 429 ||
-        err.message.includes("overloaded") ||
-        err.message.includes("quota");
+// ⭐ แก้เฉพาะตรงนี้ — โมเดลที่ถูกต้องจริง
+const MODEL_NAME = "gemini-2.5-flash";
 
-      if (overload && i < retry - 1) {
-        console.log(`⚠️ ${model} overloaded → retry (${i + 1})`);
-        await new Promise((res) => setTimeout(res, 1200));
-        continue;
-      }
+// ฟังก์ชัน sleep
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      throw err;
-    }
-  }
-}
-
-// =============== OCR API ===============
+// OCR API
 router.post("/extract", upload.single("image"), async (req, res) => {
   const filePath = req.file?.path;
 
   try {
-    if (!filePath) throw new Error("No image file uploaded.");
+    if (!filePath) throw new Error("No image file uploaded");
 
-    const imgBase64 = fs.readFileSync(filePath, "base64");
+    const imgBase64 = fs.readFileSync(filePath, { encoding: "base64" });
 
-    // BODY สำหรับ Gemini
-    const body = {
-      contents: [
-        {
-          parts: [
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imgBase64,
+    // Retry 3 ครั้ง (คงของเดิม)
+    let response = null;
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          await sleep(1200 * attempt);
+        }
+
+        response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+          {
+            contents: [
+              {
+                parts: [
+                  { text: "อ่านข้อความจากภาพแบบ OCR เป็นภาษาไทยเท่านั้น" },
+                  {
+                    inline_data: {
+                      mime_type: "image/jpeg",
+                      data: imgBase64,
+                    },
+                  },
+                ],
               },
-            },
-            {
-              text: "อ่านข้อความทั้งหมดจากภาพนี้ ตอนนี้คุณทำงานแบบ OCR ภาษาไทย ให้ส่งเฉพาะข้อความ",
-            },
-          ],
-        },
-      ],
-    };
+            ],
+          }
+        );
 
-    let response;
+        break;
+      } catch (err) {
+        const status = err.response?.status;
 
-    // -------- MODEL หลัก --------
-    let model = "gemini-1.5-flash";
+        if (
+          attempt < maxRetries - 1 &&
+          (status >= 500 || status === 429 || err.message.includes("overloaded"))
+        ) {
+          continue;
+        }
 
-    try {
-      response = await callGemini(model, body);
-    } catch (err) {
-      console.log("⛔ Flash fail → fallback เป็น flash-latest");
-      model = "gemini-1.5-flash-latest";
-      response = await callGemini(model, body);
+        throw err;
+      }
     }
 
-    // ดึงข้อความ OCR
-    const text =
-      response.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "ไม่พบข้อความในภาพ";
+    if (!response) throw new Error("OCR failed after retries");
 
-    res.json({
+    let text =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+
+    // ================================
+    //  🟡 ภาพไม่ชัด — ถาม Gemini เพิ่มความแม่นยำ
+    // ================================
+    const blurCheck = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: `จงตอบว่า "ชัด" หรือ "ไม่ชัด" เท่านั้น  
+ข้อความต่อไปนี้อ่านออกหรือไม่:  
+"${text}"`,
+              },
+            ],
+          },
+        ],
+      }
+    );
+
+    const blurResult =
+      blurCheck.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    if (blurResult.includes("ไม่ชัด")) {
+      return res.json({
+        success: false,
+        message: "ภาพไม่ชัด กรุณาถ่ายใหม่ชัดๆ ครับ",
+      });
+    }
+
+
+    // ================================
+    //  🟢 ตรวจข้อมูลเกษตร แต่ไม่ตัดข้อความทิ้ง
+    // ================================
+    const agriKeywords = [
+      "ตัน",
+      "กิโล",
+      "บาท",
+      "ลำไย",
+      "เกษตร",
+      "ผลผลิต",
+      "ราคา",
+      "สวน",
+      "ปุ๋ย",
+      "รายรับ",
+      "รายจ่าย",
+      "ต้นทุน",
+    ];
+
+    const foundAgri = agriKeywords.some((k) => text.includes(k));
+
+    if (!foundAgri) {
+      return res.json({
+        success: false,
+        message: "ไม่พบข้อมูลการเกษตรในภาพนี้",
+        text,
+      });
+    }
+
+
+    // ================================
+    // ส่งผลลัพธ์จริง (ของเดิมพี่)
+    // ================================
+    return res.json({
       success: true,
       markdown: text,
-      modelUsed: model,
     });
-  } catch (err) {
-    const errorDetail = err.response?.data || err.message;
-    console.error("OCR ERROR:", errorDetail);
 
-    res.status(500).json({
+  } catch (err) {
+    console.error("OCR ERROR:", err);
+    return res.status(500).json({
       success: false,
-      detail: errorDetail,
+      detail: err.response?.data || err.message,
     });
   } finally {
-    if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
   }
 });
 

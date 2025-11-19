@@ -5,12 +5,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: true, // ⭐ แก้ปัญหา ngrok เปลี่ยน URL
+    allowedHosts: true,
     proxy: {
       "/api": {
-        target: "http://localhost:4000", // ⭐ backend จริง
+        target: "http://localhost:4000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },

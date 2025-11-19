@@ -31,7 +31,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // mobile camera / curl
+      if (!origin) return callback(null, true);
 
       const isAllowed = allowedOrigins.some((o) =>
         origin.includes(o.replace("*", ""))
@@ -56,10 +56,13 @@ const cropTypeRoutes = require('./src/routes/cropTypes');
 const userRoutes = require('./src/routes/user');
 const calculationRoutes = require('./src/routes/calculations');
 const ocrRoutes = require('./src/routes/ocr'); // 💡 ไฟล์สำหรับ OCR route
+const extractRoutes = require("./src/routes/extract");
 
 // Public routes
 app.use('/api/auth', authRoutes);
 app.use('/api/crop-types', cropTypeRoutes);
+app.use("/api", ocrRoutes);
+app.use("/api", extractRoutes);   // ⭐ เพิ่มใหม่
 
 // Protected routes
 app.use('/api/farms', auth, farmRoutes);
