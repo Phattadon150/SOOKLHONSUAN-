@@ -1,603 +1,404 @@
-// ValueSummary.jsx (ฉบับอัปเกรด: แก้ปัญหา 'unknown' โดยการ Assume ใน Frontend)
-
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // ⭐️ ใช้ Framer Motion
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import AlertModal from "../components/AlertModal";
 
-// (Helper: Format ตัวเลข ... เหมือนเดิม)
+// Helper: Format ตัวเลข
 const formatNum = (num, digits = 0) => {
   const n = Number(num);
-  if (!Number.isFinite(n) || n === 0) return digits === 0 ? "0" : "0.00";
+  if (!Number.isFinite(n)) return digits === 0 ? "0" : "0.00";
   return n.toLocaleString("th-TH", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 };
 
-// (สีสำหรับกราฟ ... เหมือนเดิม)
+// Helper Component: ตัวเลขวิ่ง (CountUp)
+const CountUp = ({ value, prefix = "", suffix = "" }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value;
+    if (start === end) return;
+
+    let totalMilSec = 1000; // เวลาวิ่ง 1 วินาที
+    let incrementTime = (totalMilSec / end) * 5; // ปรับความเร็ว
+
+    let timer = setInterval(() => {
+      start += (end - start) / 10; // Ease-out effect
+      if (Math.abs(end - start) < 1) {
+         setDisplayValue(end);
+         clearInterval(timer);
+      } else {
+         setDisplayValue(start);
+      }
+    }, 30);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <span>{prefix}{formatNum(displayValue, 2)}{suffix}</span>;
+};
+
+
 const PIE_COLORS = [
   "#818cf8", "#f87171", "#60a5fa", "#34d399", 
   "#facc15", "#fb923c", "#c084fc",
 ];
 
-// ⭐️ (ใหม่) ตารางค้นหาชนิดพืช (สำหรับแก้ 'unknown' ชั่วคราว)
-// (นี่คือส่วนที่เรา "Assume" หรือ "สมมติ" ตัวเลขตามที่คุณขอ)
-const TEMP_FRUIT_LOOKUP = {
-  1: 'longan',  // (สมมติ ID 1 คือสวนลำไย)
-  2: 'durian',  // (สมมติ ID 2 คือสวนทุเรียน)
-  // (หากคุณมี ID 3, 4, 5... ให้เพิ่มที่นี่)
-};
-
-
 export default function ValueSummary() {
   const navigate = useNavigate();
-  const [calculationMode, setCalculationMode] = useState("marketPrice");
   
-  // (State ดึงข้อมูล)
   const [isLoading, setIsLoading] = useState(true);
-  const [allCalculations, setAllCalculations] = useState([]);
   const [farmList, setFarmList] = useState([]);
+  const [allCalculations, setAllCalculations] = useState([]);
+  const [cropTypes, setCropTypes] = useState({}); 
+  
+  // State การคำนวณ
   const [selectedFarmId, setSelectedFarmId] = useState("");
+  const [calculationMode, setCalculationMode] = useState("marketPrice"); 
+  const [tempCustomPrice, setTempCustomPrice] = useState(""); 
 
-  // (State ประมวลผล)
+  // State ผลลัพธ์
+  const [marketPrices, setMarketPrices] = useState({}); 
   const [yield6MonthSum, setYield6MonthSum] = useState(0);
   const [yieldSumByFarm, setYieldSumByFarm] = useState(new Map());
   const [pieSegments, setPieSegments] = useState([]);
-  
-  // (State Modal)
   const [modalState, setModalState] = useState({ isOpen: false, type: 'error', title: '', message: '' });
-  
-  // (State ราคากลาง)
-  const [customPrice, setCustomPrice] = useState("");
-  const [marketPrices, setMarketPrices] = useState({});
-  const [isPriceLoading, setIsPriceLoading] = useState(true);
 
-
-  // 1. useEffect - ดึงข้อมูล Calculation ทั้งหมด (ตอนโหลด)
-  // -----------------------------------------------------
+  // 1. โหลดข้อมูล
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-    
-    const fetchData = async () => {
+    if (!token) { navigate("/login"); return; }
+
+    const fetchAllData = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("http://localhost:4000/api/calculations", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูลการคำนวณทั้งหมดได้");
-        
-        // (ใช้ data จริง)
-        const data = await res.json(); 
-        setAllCalculations(data); 
+        const headers = { Authorization: `Bearer ${token}` };
+        const apiBase = "http://localhost:4000/api"; 
 
-        // สร้าง Farm List (สำหรับ Dropdown)
-        const farmMap = new Map();
-        for (const calc of data) {
-          if (!farmMap.has(calc.farm_id)) {
-            
-            // ⭐️ (แก้ไข) Logic การค้นหา fruit_type
-            // 1. ลองหาจากข้อมูลที่ส่งมา (เผื่ออนาคต)
-            let fruitType = calc.fruit_type; 
-            
-            // 2. ถ้าไม่เจอ ให้หาจากตารางชั่วคราว
-            if (!fruitType) {
-              fruitType = TEMP_FRUIT_LOOKUP[calc.farm_id];
-            }
+        const [resFarms, resCrops, resCalcs, resPrices] = await Promise.all([
+          fetch(`${apiBase}/farms`, { headers }),
+          fetch(`${apiBase}/crop-types`, { headers }),
+          fetch(`${apiBase}/calculations`, { headers }),
+          fetch(`${apiBase}/market-prices/latest`, { headers }) 
+        ]);
 
-            farmMap.set(calc.farm_id, {
-              id: calc.farm_id, 
-              name: calc.farm_name || `ฟาร์ม (ID: ${calc.farm_id})`,
-              fruit_type: fruitType || 'unknown', // 👈 (ถ้าไม่เจอจริงๆ ค่อย unknown)
-              saved_price: calc.farm_saved_price,
-            });
-          }
-        }
-        
-        const realFarms = Array.from(farmMap.values());
+        if (!resFarms.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
 
-        // (เพิ่มฟาร์มตัวอย่าง)
-        const demoFarms = [
-          {
-            id: 'demo-1', 
-            name: "ฟาร์มตัวอย่าง 1 (ลิ้นจี่)",
-            fruit_type: 'lychee',
-            saved_price: null 
-          },
-          {
-            id: 'demo-2',
-            name: "ฟาร์มตัวอย่าง 2 (มะม่วง)",
-            fruit_type: 'mango',
-            saved_price: 85.00
-          }
-        ];
+        const farmsData = await resFarms.json();
+        const cropsData = resCrops.ok ? await resCrops.json() : [];
+        const calcsData = await resCalcs.json();
+        const pricesData = resPrices.ok ? await resPrices.json() : [];
 
-        setFarmList([...realFarms, ...demoFarms]); // (รวมฟาร์มจริง + ตัวอย่าง)
+        const cropMap = {};
+        cropsData.forEach(c => cropMap[c.id] = c.name);
+        setCropTypes(cropMap);
 
+        const priceMap = {};
+        if (Array.isArray(pricesData)) {
+          pricesData.forEach(p => priceMap[p.crop_type_id] = parseFloat(p.price_avg));
+        } 
+        setMarketPrices(priceMap);
+
+        setFarmList(farmsData.map(f => ({
+          id: f.id,
+          name: f.name,
+          crop_type_id: f.crop_type_id,
+          custom_price: f.custom_price ? parseFloat(f.custom_price) : null 
+        })));
+
+        setAllCalculations(calcsData);
       } catch (err) {
-        setModalState({ isOpen: true, type: 'error', title: 'เกิดข้อผิดพลาด', message: err.message });
-      } finally {
-        setIsLoading(false);
-      }
+        console.error(err);
+      } finally { setIsLoading(false); }
     };
-    
-    fetchData();
+    fetchAllData();
   }, [navigate]);
 
-  
-  // 2. useEffect - ดึง API ราคากลาง
-  // -----------------------------------------------------
+  // 2. Update Temp Input
   useEffect(() => {
-    if (!farmList.length) return;
-    
-    setIsPriceLoading(true);
-    setMarketPrices({});
-
-    const fetchMarketPrices = async () => {
-      let fruitsToFetch = [];
-      
-      if (selectedFarmId) {
-        // (กรณีเลือกฟาร์มเดียว)
-        const farm = farmList.find(f => f.id == selectedFarmId); 
-        if (farm) {
-          fruitsToFetch = [farm.fruit_type];
-        }
-      } else {
-        // (กรณีเลือก "ทุกสวน")
-        fruitsToFetch = [...new Set(farmList.map(f => f.fruit_type))];
-      }
-      
-      if (fruitsToFetch.length === 0) {
-        setIsPriceLoading(false);
-        return;
-      }
-      
-      // ⚠️ TODO: นี่คือส่วนจำลอง API
-      const timer = setTimeout(() => {
-        // (จำลองผลลัพธ์จาก API)
-        const simulatedPrices = {};
-        if (fruitsToFetch.includes('longan')) simulatedPrices['longan'] = 65.50; // 👈 (ราคาจริง)
-        if (fruitsToFetch.includes('durian')) simulatedPrices['durian'] = 120.00; // 👈 (ราคาจริง)
-        if (fruitsToFetch.includes('unknown')) simulatedPrices['unknown'] = 0;
-        
-        // (ราคาตัวอย่าง)
-        if (fruitsToFetch.includes('lychee')) simulatedPrices['lychee'] = 70.00;
-        if (fruitsToFetch.includes('mango')) simulatedPrices['mango'] = 55.00;
-        
-        setMarketPrices(simulatedPrices);
-        setIsPriceLoading(false);
-      }, 1000);
-
-      return () => clearTimeout(timer); 
-    };
-    
-    fetchMarketPrices();
+    if (selectedFarmId) {
+      const farm = farmList.find(f => f.id == selectedFarmId);
+      setTempCustomPrice(farm?.custom_price ? farm.custom_price.toString() : "");
+    } else {
+      setTempCustomPrice("");
+    }
   }, [selectedFarmId, farmList]);
 
-  
-  // 3. useEffect - ประมวลผลข้อมูลใหม่ (เมื่อตัวกรองเปลี่ยน)
-  useEffect(() => {
-    // (กรองข้อมูลตามฟาร์มที่เลือก)
-    const calcsForFarm = selectedFarmId 
-      ? allCalculations.filter(calc => calc.farm_id == selectedFarmId) 
-      : allCalculations;
+  // 3. Auto-save Custom Price
+  const handleSaveCustomPrice = async (newPrice) => {
+    const priceVal = parseFloat(newPrice);
+    setFarmList(prev => prev.map(f => f.id == selectedFarmId ? { ...f, custom_price: isNaN(priceVal) ? null : priceVal } : f));
+    
+    if (!selectedFarmId) return;
 
-    // (กรองข้อมูล 6 เดือน)
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`http://localhost:4000/api/farms/${selectedFarmId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ custom_price: isNaN(priceVal) ? null : priceVal }) 
+      });
+    } catch (err) { console.error("Failed to save price", err); }
+  };
+
+  // 4. Process Yield & Graph
+  useEffect(() => {
+    if (isLoading) return;
+    const calcsForFarm = selectedFarmId ? allCalculations.filter(calc => calc.farm_id == selectedFarmId) : allCalculations;
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     sixMonthsAgo.setHours(0, 0, 0, 0);
 
-    const calcsLast6Months = calcsForFarm.filter(calc => {
-      const calcDate = new Date(calc.calc_date);
-      return calcDate >= sixMonthsAgo;
-    });
-    
-    calcsLast6Months.sort((a, b) => new Date(a.calc_date) - new Date(b.calc_date));
-
-    // (1. คำนวณยอดรวม กก.)
-    const totalYield = calcsLast6Months.reduce((sum, calc) => {
-      return sum + (calc.actual_yield ?? calc.estimated_yield ?? 0);
-    }, 0);
+    const calcsLast6Months = calcsForFarm.filter(calc => new Date(calc.calc_date) >= sixMonthsAgo);
+    const totalYield = calcsLast6Months.reduce((sum, calc) => sum + Number(calc.actual_yield || calc.estimated_yield || 0), 0);
     setYield6MonthSum(totalYield);
-    
-    // (2. คำนวณยอดรวม กก. แบบแยกฟาร์ม (สำหรับ Logic "ทุกสวน"))
+
     const yieldMap = new Map();
     if (!selectedFarmId) {
       for (const calc of calcsLast6Months) {
-        const kg = (calc.actual_yield ?? calc.estimated_yield ?? 0);
+        const kg = Number(calc.actual_yield || calc.estimated_yield || 0);
         const current = yieldMap.get(calc.farm_id) || 0;
         yieldMap.set(calc.farm_id, current + kg);
       }
     }
     setYieldSumByFarm(yieldMap);
 
-    // (3. สร้างข้อมูลกราฟ)
     if (totalYield > 0) {
-      let currentDegree = 0;
-      const segments = calcsLast6Months.map((calc, index) => {
-        const kg = (calc.actual_yield ?? calc.estimated_yield ?? 0);
-        const percent = (kg / totalYield);
-        const degrees = Math.max(percent * 360, 1.0); 
-        
-        const segmentData = {
-          name: new Date(calc.calc_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + (selectedFarmId ? '' : ` (${calc.farm_name})`),
-          kg: kg,
-          percent: percent * 100,
-          color: PIE_COLORS[index % PIE_COLORS.length],
-          startDegree: currentDegree,
-          endDegree: currentDegree + degrees,
-        };
-        currentDegree += degrees;
-        return segmentData;
-      });
-      setPieSegments(segments);
-    } else {
-      setPieSegments([]);
-    }
-  }, [selectedFarmId, allCalculations]);
-  
+       let currentDegree = 0;
+       const segments = calcsLast6Months.map((calc, index) => {
+          const kg = Number(calc.actual_yield || calc.estimated_yield || 0);
+          const percent = (kg / totalYield);
+          const degrees = Math.max(percent * 360, 1.0);
+          const seg = { 
+              name: new Date(calc.calc_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + (selectedFarmId ? '' : ` (${calc.farm_name || 'Farm'})`),
+              kg, percent: percent*100, color: PIE_COLORS[index % PIE_COLORS.length],
+              startDegree: currentDegree, endDegree: currentDegree + degrees
+          };
+          currentDegree += degrees;
+          return seg;
+       });
+       setPieSegments(segments);
+    } else { setPieSegments([]); }
+  }, [selectedFarmId, allCalculations, isLoading]);
 
-  // 4. (Logic ใหม่) คำนวณมูลค่ารวม (ใช้ useMemo)
+
+  // 5. Hybrid Calculation Logic
   const calculatedTotalValue = useMemo(() => {
-    if (isPriceLoading) return 0;
-    
     let totalValue = 0;
 
     if (selectedFarmId) {
-      // (กรณี A: เลือกฟาร์มเดียว)
-      const farm = farmList.find(f => f.id == selectedFarmId); 
+      const farm = farmList.find(f => f.id == selectedFarmId);
       if (!farm) return 0;
-      
+
       if (calculationMode === 'marketPrice') {
-        const price = marketPrices[farm.fruit_type] || 0;
-        totalValue = yield6MonthSum * price;
-      } else { // 'customPrice'
-        const price = parseFloat(customPrice) || 0;
+        totalValue = yield6MonthSum * (marketPrices[farm.crop_type_id] || 0);
+      } else { 
+        const price = parseFloat(tempCustomPrice) || 0;
         totalValue = yield6MonthSum * price;
       }
-      
-    } else {
-      // (กรณี B: เลือก "ทุกสวน")
-      
-      if (calculationMode === 'marketPrice') {
-        // (B1: ทุกสวน - ใช้ราคากลาง)
-        for (const [farmId, yieldKg] of yieldSumByFarm.entries()) {
-          const farm = farmList.find(f => f.id == farmId); 
-          if (!farm) continue;
-          
-          const price = marketPrices[farm.fruit_type] || 0;
-          totalValue += yieldKg * price;
-        }
-        
-      } else { // 'customPrice' (Logic ที่ user ขอ)
-        // (B2: ทุกสวน - ใช้ราคาจริง/ทดแทน)
-        for (const [farmId, yieldKg] of yieldSumByFarm.entries()) {
-          const farm = farmList.find(f => f.id == farmId); 
-          if (!farm) continue;
+    } 
+    else {
+      for (const [farmId, yieldKg] of yieldSumByFarm.entries()) {
+        const farm = farmList.find(f => f.id == farmId);
+        if (!farm) continue;
 
-          let price = farm.saved_price; 
-          
-          if (!price || price === 0) {
-            price = marketPrices[farm.fruit_type] || 0;
+        let priceToUse = 0;
+        if (calculationMode === 'marketPrice') {
+          priceToUse = marketPrices[farm.crop_type_id] || 0;
+        } else {
+          if (farm.custom_price && farm.custom_price > 0) {
+            priceToUse = farm.custom_price;
+          } else {
+            priceToUse = marketPrices[farm.crop_type_id] || 0;
           }
-          
-          totalValue += yieldKg * price;
         }
+        totalValue += yieldKg * priceToUse;
       }
     }
-    
     return totalValue;
+  }, [calculationMode, selectedFarmId, farmList, yieldSumByFarm, yield6MonthSum, marketPrices, tempCustomPrice]);
 
-  }, [
-    calculationMode, selectedFarmId, farmList, 
-    yieldSumByFarm, yield6MonthSum, 
-    marketPrices, customPrice, isPriceLoading
-  ]);
+  const selectedFarm = farmList.find(f => f.id == selectedFarmId);
+  const currentMarketPrice = selectedFarm ? (marketPrices[selectedFarm.crop_type_id] || 0) : 0;
+  const gradientString = pieSegments.map(seg => `${seg.color} ${seg.startDegree}deg ${seg.endDegree}deg`).join(', ');
 
-
-  // (สร้าง Gradient - เหมือนเดิม)
-  const gradientString = pieSegments.map(seg => 
-    `${seg.color} ${seg.startDegree}deg ${seg.endDegree}deg`
-  ).join(', ');
-
-  // (หาชื่อฟาร์มที่เลือก - เหมือนเดิม)
-  const selectedFarm = selectedFarmId 
-    ? farmList.find(f => f.id == selectedFarmId) 
-    : null;
-  const headerTitle = selectedFarm 
-    ? `สรุปมูลค่าสวน (${selectedFarm.name})`
-    : "สรุปมูลค่าสวน (ทุกสวน)";
-
-
-  // (หน้า Loading - เหมือนเดิม)
-  if (isLoading) {
-    return (
-      <div className="flex flex-col min-h-screen bg-stone-50">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center">
-          <p>กำลังโหลดข้อมูล...</p>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  // Animation Variants
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { staggerChildren: 0.1, duration: 0.5 } 
+    }
+  };
   
-  // ------------------------------------
-  // ( JSX RENDER )
-  // ------------------------------------
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0 }
+  };
+
+  if (isLoading) return <div className="p-10 text-center animate-pulse text-green-700">🌱 กำลังโหลดข้อมูลสวน...</div>;
+
   return (
     <div className="flex flex-col min-h-screen bg-stone-50">
       <Navbar />
-
-      <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8">
+      <motion.main 
+        className="flex-1 w-full max-w-3xl mx-auto px-4 py-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         
-        {/* (ส่วนหัวข้อ - เหมือนเดิม) */}
-        <motion.div 
-          className="text-center mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0 }}
-        >
-          <h1 className="text-3xl font-bold text-green-900 mb-2">
-            {headerTitle}
+        <motion.div className="text-center mb-8" variants={itemVariants}>
+          <h1 className="text-3xl font-bold text-green-900 mb-2 drop-shadow-sm">
+            {selectedFarm ? `สรุปมูลค่าสวน (${selectedFarm.name})` : "สรุปมูลค่าสวน (ทุกสวน)"}
           </h1>
           <p className="text-lg text-gray-600">
-            ประเมินมูลค่าผลผลิตรวมของคุณ (6 เดือนล่าสุด)
+            {selectedFarm ? "ประเมินรายได้ของสวนนี้" : "ประเมินรายได้รวมทุกสวนแบบอัตโนมัติ"}
           </p>
         </motion.div>
 
-        {/* (Dropdown เลือกสวน - เหมือนเดิม) */}
-        <motion.div
-          className="mb-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-        >
-          <label className="block text-gray-700 mb-1 font-semibold">
-            เลือกสวน
-          </label>
+        <motion.div className="mb-6" variants={itemVariants}>
           <select
             value={selectedFarmId}
-            onChange={(e) => {
-              setSelectedFarmId(e.target.value);
-              setCustomPrice(""); 
-            }}
-            className="w-full border border-gray-300 rounded-full px-4 py-2 bg-white"
+            onChange={(e) => setSelectedFarmId(e.target.value)}
+            className="w-full border border-gray-300 rounded-full px-4 py-3 bg-white shadow-sm focus:ring-4 focus:ring-green-200 focus:border-green-500 outline-none transition-all cursor-pointer hover:bg-green-50"
           >
-            <option value="">-- สรุปทุกสวน --</option>
+            <option value="">-- สรุปทุกสวน (Hybrid Calculation) --</option>
             {farmList.map(farm => (
               <option key={farm.id} value={farm.id}>
-                {farm.name}
+                {farm.name} ({cropTypes[farm.crop_type_id] || '-'}) {farm.custom_price ? `[ระบุเอง: ${farm.custom_price}]` : ''}
               </option>
             ))}
           </select>
         </motion.div>
 
-        {/* (Card 1: ยอดรวม 6 เดือน - เหมือนเดิม) */}
         <motion.div 
-          key={`card1-${selectedFarmId}`} 
-          className="bg-white shadow-xl rounded-2xl p-6 mb-6 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
+          className="bg-white shadow-xl rounded-2xl p-6 mb-6 text-center transform transition hover:scale-[1.02] hover:shadow-2xl duration-300"
+          variants={itemVariants}
         >
-          <p className="text-gray-700 text-lg">
-            ผลผลิตรวม 6 เดือนล่าสุด (ที่เลือก)
-          </p>
-          <p className="text-green-800 text-4xl font-bold">
-            {formatNum(yield6MonthSum, 2)}
-            <span className="text-2xl font-medium"> กก.</span>
+          <p className="text-gray-700 text-lg font-medium">ผลผลิตรวม 6 เดือนล่าสุด</p>
+          <p className="text-green-700 text-5xl font-bold mt-2 tracking-tighter">
+            <CountUp value={yield6MonthSum} suffix=" กก." />
           </p>
         </motion.div>
 
-        {/* Section: คำนวณมูลค่า - เหมือนเดิม */}
-        <motion.h2 
-          className="text-xl font-semibold text-green-900 mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-        >
-          คำนวณมูลค่า (จากยอด 6 เดือน)
-        </motion.h2>
-
-        <motion.div 
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-        >
-          {/* (Card ราคากลาง - Logic ใหม่ - เหมือนเดิม) */}
-          <motion.button
+        {/* Control Buttons */}
+        <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" variants={itemVariants}>
+          <button
             onClick={() => setCalculationMode("marketPrice")}
-            className={`bg-white shadow-xl rounded-2xl p-4 text-left transition-all ${
-              calculationMode === "marketPrice"
-                ? "ring-2 ring-green-600"
-                : "opacity-70 hover:opacity-100"
+            className={`relative overflow-hidden bg-white shadow-md rounded-2xl p-5 text-left border-2 transition-all duration-300 ${
+              calculationMode === "marketPrice" 
+                ? "border-green-500 bg-green-50 ring-2 ring-green-200 scale-[1.02]" 
+                : "border-transparent hover:shadow-lg hover:border-green-200"
             }`}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={isPriceLoading}
           >
-            <span className="font-semibold text-gray-800">
-              ใช้ราคากลาง (จาก API)
-            </span>
-            <div className="mt-1 h-8"> 
-              {isPriceLoading ? (
-                <div className="text-sm text-gray-500 flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                  กำลังดึงราคากลาง...
-                </div>
-              ) : selectedFarm ? (
-                <div className="flex items-baseline gap-2">
-                  <p className="text-red-600 text-2xl font-bold">
-                    {/* (แก้) ตรวจสอบว่ามีราคาหรือไม่ */} 
-                    {marketPrices[selectedFarm.fruit_type] ? formatNum(marketPrices[selectedFarm.fruit_type], 2) : "ไม่มีราคากลาง"}
-                  </p>
-                  <span className="text-sm text-gray-500">บาท/กก. ({selectedFarm.fruit_type})</span>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-600 pt-1">
-                  คำนวณจากราคากลางของแต่ละสวน
-                </div>
-              )}
+            <div className="flex justify-between items-center">
+                <span className="font-semibold text-gray-800 text-lg">ใช้ราคากลาง</span>
+                {calculationMode === "marketPrice" && <span className="text-green-600 text-2xl">✓</span>}
             </div>
-          </motion.button>
+            <div className="mt-2 h-8 flex items-center text-sm text-gray-500"> 
+               {selectedFarm ? `${formatNum(currentMarketPrice, 2)} บาท/กก.` : "ใช้ราคากลางของพืชแต่ละสวน"}
+            </div>
+          </button>
           
-          {/* (Card ราคาที่กรอกเอง - Logic ใหม่ - เหมือนเดิม) */}
-          <motion.button
+          <button
             onClick={() => setCalculationMode("customPrice")}
-            className={`bg-white shadow-xl rounded-2xl p-4 text-left transition-all ${
-              calculationMode === "customPrice"
-                ? "ring-2 ring-green-600"
-                : "opacity-70 hover:opacity-100"
+            className={`relative overflow-hidden bg-white shadow-md rounded-2xl p-5 text-left border-2 transition-all duration-300 ${
+              calculationMode === "customPrice" 
+                ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200 scale-[1.02]" 
+                : "border-transparent hover:shadow-lg hover:border-blue-200"
             }`}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
           >
-            <span className="font-semibold text-gray-800">
-              {selectedFarm ? "กรอกราคาที่ขายได้จริง" : "ใช้ราคาที่ขายได้จริง (ที่บันทึกไว้)"}
-            </span>
-            <div className="mt-1 h-8">
-              {selectedFarm ? (
-                <div className="flex items-baseline gap-2 h-8">
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    value={customPrice}
-                    onChange={(e) => setCustomPrice(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="0.00"
-                    className="w-full text-blue-600 text-2xl font-bold border-b-2 border-gray-200 outline-none focus:border-blue-500"
-                  />
-                  <span className="text-sm text-gray-500">บาท/กก.</span>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-600 pt-1">
-                  คำนวณจากราคาจริง (ถ้ามี)
-                  <br/>
-                  <span className="text-xs text-gray-500">(ถ้าไม่มี ใช้ราคากลางทดแทน)</span>
-                </div>
-              )}
+             <div className="flex justify-between items-center">
+                <span className="font-semibold text-gray-800 text-lg">
+                   {selectedFarm ? "ระบุราคาเอง" : "ราคาผสม (Hybrid)"}
+                </span>
+                {calculationMode === "customPrice" && <span className="text-blue-600 text-2xl">✎</span>}
             </div>
-          </motion.button>
-        </motion.div>
-        
-        {/* (Card 3: สรุปมูลค่า - เหมือนเดิม) */}
-        <motion.div 
-          key={`card3-${selectedFarmId}-${calculationMode}-${customPrice}-${JSON.stringify(marketPrices)}`} 
-          className="bg-white shadow-xl rounded-2xl p-6 mb-8 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-        >
-          <p className="text-gray-700 text-lg">
-            มูลค่าที่คำนวณได้ (จากยอด 6 เดือน)
-          </p>
-          <p className="text-green-800 text-5xl font-bold my-2">
-            {formatNum(calculatedTotalValue, 2)}
-          </p>
-          <p className="text-gray-700 text-lg">บาท</p>
-        </motion.div>
-
-
-        {/* (Section: สัดส่วนผลผลิต - เหมือนเดิม) */}
-        <motion.h2 
-          className="text-xl font-semibold text-green-900 mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.6 }}
-        >
-          สัดส่วนผลผลิต (6 เดือนล่าสุด)
-        </motion.h2> 
-        
-        {/* (Card 4: กราฟ Dynamic - เหมือนเดิม) */}
-        <motion.div 
-          key={`card4-${selectedFarmId}`} 
-          className="bg-white shadow-xl rounded-2xl p-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.7 }}
-        >
-          <div className="flex flex-col md:flex-row gap-6 items-center">
             
-            {/* (กราฟ - เหมือนเดิม) */}
-            <motion.div 
-              key={`pie-${selectedFarmId}`} 
-              className="flex-shrink-0 mx-auto"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.2, type: "spring", stiffness: 150 }}
-            >
-              <div 
-                className="w-48 h-48 rounded-full"
-                style={{ 
-                  background: gradientString ? `conic-gradient(from -90deg, ${gradientString})` : '#e5e7eb'
-                }}
-              >
-                {pieSegments.length === 0 && (
-                  <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-center text-gray-500 text-sm p-4">
-                    ไม่มีข้อมูล (6 เดือนล่าสุด)
-                  </div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* (Legend - เหมือนเดิม) */}
-            <motion.div 
-              key={`legend-${selectedFarmId}`} 
-              className="flex-1 w-full"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-            >
-              <div className="mb-4 space-y-2 max-h-40 overflow-y-auto pr-2">
-                {pieSegments.length > 0 ? pieSegments.map((seg, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <span 
-                      className="w-4 h-4 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: seg.color }}
-                    ></span>
-                    <span className="text-sm">
-                      {seg.name} - {formatNum(seg.kg, 0)} กก. ({formatNum(seg.percent, 2)}%)
+            <div className="mt-2 flex items-center gap-2 h-8">
+                {selectedFarm ? (
+                    <div className="flex items-baseline gap-2 w-full">
+                        <input 
+                          type="number" 
+                          value={tempCustomPrice}
+                          onChange={(e) => setTempCustomPrice(e.target.value)}
+                          onBlur={(e) => handleSaveCustomPrice(e.target.value)} 
+                          onClick={(e) => { e.stopPropagation(); setCalculationMode("customPrice"); }}
+                          placeholder="0.00"
+                          className="w-full max-w-[120px] text-blue-600 text-2xl font-bold border-b-2 border-gray-300 bg-transparent outline-none focus:border-blue-500 transition-all"
+                        />
+                        <span className="text-sm text-gray-500">บาท/กก.</span>
+                    </div>
+                ) : (
+                    <span className="text-sm text-blue-600 font-medium animate-pulse">
+                        สวนไหนไม่ระบุ จะใช้ราคากลางแทน ✅
                     </span>
-                  </div>
-                )) : (
-                  <p className="text-sm text-gray-500">ไม่มีข้อมูลผลผลิตใน 6 เดือนล่าสุด</p>
                 )}
-              </div>
-
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-sm font-semibold text-gray-800">
-                  เคล็ดลับ:
-                </p>
-                <p className="text-sm text-gray-600">
-                  ข้อมูลนี้สรุปจากรายการที่บันทึกย้อนหลัง 6 เดือน
-                  ลองเปรียบเทียบมูลค่าระหว่าง "ราคากลาง" และ "ราคาที่ขายได้จริง"
-                  เพื่อดูประสิทธิภาพการขายของคุณ
-                </p>
-              </div>
-            </motion.div>
-
-          </div>
+            </div>
+          </button>
         </motion.div>
-      </main>
 
+        {/* Total Value */}
+        <motion.div 
+          className="bg-gradient-to-br from-green-50 to-white shadow-xl rounded-2xl p-8 mb-8 text-center border border-green-100 relative overflow-hidden"
+          variants={itemVariants}
+          whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+        >
+          <div className="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
+          <p className="text-gray-600 text-xl font-medium">มูลค่ารวมโดยประมาณ</p>
+          <p className="text-green-800 text-6xl font-extrabold my-4 tracking-tight drop-shadow-sm">
+             <CountUp value={calculatedTotalValue} />
+          </p>
+          <p className="text-gray-500 text-lg font-medium bg-white/50 inline-block px-4 py-1 rounded-full">บาท (THB)</p>
+        </motion.div>
+
+        {/* Pie Chart Area */}
+        <motion.div 
+          className="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
+          variants={itemVariants}
+        >
+            <h2 className="text-xl font-bold mb-6 text-gray-800 border-l-4 border-green-500 pl-3">สัดส่วนผลผลิต</h2>
+            <div className="flex flex-col md:flex-row items-center gap-10 justify-center">
+                
+                <motion.div 
+                  className="relative w-56 h-56 rounded-full flex-shrink-0 shadow-inner border-4 border-white ring-1 ring-gray-200"
+                  style={{ background: pieSegments.length ? `conic-gradient(from -90deg, ${gradientString})` : '#f3f4f6' }}
+                  initial={{ rotate: -180, scale: 0.5, opacity: 0 }}
+                  animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                  transition={{ duration: 1, ease: "backOut" }}
+                >
+                   {!pieSegments.length && <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm font-medium">ไม่มีข้อมูล</div>}
+                </motion.div>
+
+                <div className="flex-1 w-full max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                    {pieSegments.map((seg, i) => (
+                        <motion.div 
+                          key={i} 
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-green-50 transition-colors cursor-default"
+                          initial={{ x: 20, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          transition={{ delay: i * 0.1 }}
+                        >
+                            <span className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm" style={{backgroundColor: seg.color}}></span>
+                            <span className="flex-1 truncate text-gray-700 font-medium">{seg.name}</span>
+                            <span className="font-bold text-green-800 bg-white px-2 py-1 rounded-md shadow-sm text-sm">{formatNum(seg.kg, 0)} กก.</span>
+                        </motion.div>
+                    ))}
+                    {!pieSegments.length && <div className="text-center text-gray-400 py-4">ยังไม่มีประวัติการคำนวณ</div>}
+                </div>
+            </div>
+        </motion.div>
+
+      </motion.main>
       <Footer />
-      
-      {/* (Modal สำหรับ Error - เหมือนเดิม) */}
-      <AlertModal 
-        isOpen={modalState.isOpen}
-        onClose={() => setModalState({ ...modalState, isOpen: false })}
-        type={modalState.type}
-        title={modalState.title}
-        message={modalState.message}
-      />
+      <AlertModal isOpen={modalState.isOpen} onClose={() => setModalState({...modalState, isOpen:false})} type={modalState.type} title={modalState.title} message={modalState.message} />
     </div>
   );
 }
