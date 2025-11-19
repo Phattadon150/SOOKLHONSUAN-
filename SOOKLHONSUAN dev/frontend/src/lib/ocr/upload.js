@@ -1,20 +1,12 @@
-const LOCAL = import.meta.env.VITE_LOCAL_URL;
-const NGROK = import.meta.env.VITE_NGROK_URL;
+import { BASE_URL } from "../api";  
+// ^^^ NOTE: ถ้าตำแหน่ง API อยู่ไม่ใช่ที่นี่ ให้บอกพี่ เดี๋ยวแก้ path ให้ถูก
 
-// 📌 ตรวจว่าเป็น dev เครื่องคอมไหม
-const isLocalhost =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1";
-
-// 📌 ถ้าเป็นเครื่องคอม → ใช้ local backend
-// 📌 ถ้าเป็นมือถือ (IP 192.168.x.x / 10.x.x.x / 172.x.x.x / undefined) → ใช้ ngrok
-const API_URL = isLocalhost ? LOCAL : NGROK;
-
+// 📌 อัปโหลดรูปภาพไปที่ backend
 export async function uploadImage(file) {
   const form = new FormData();
   form.append("image", file);
 
-  const res = await fetch(`${API_URL}/api/extract`, {
+  const res = await fetch(`${BASE_URL}/api/extract`, {
     method: "POST",
     body: form,
   });
@@ -22,8 +14,9 @@ export async function uploadImage(file) {
   return res.json();
 }
 
+// 📌 Extract text fields
 export async function extractFields(text) {
-  const res = await fetch(`${API_URL}/api/extract-fields`, {
+  const res = await fetch(`${BASE_URL}/api/extract-fields`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
@@ -31,3 +24,4 @@ export async function extractFields(text) {
 
   return res.json();
 }
+

@@ -6,6 +6,13 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Modal from "../components/Modal";
 
+// ใส่ตรงนี้หลัง import
+const BASE_URL =
+  window.location.hostname === "localhost"
+    ? "http://localhost:4000"
+    : "https://0e5f0dbc955a.ngrok-free.app";
+
+
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +54,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch("http://localhost:4000/api/auth/login", {
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -141,7 +148,7 @@ export default function Login() {
           {/* ⭐ NEW GOOGLE LOGIN BUTTON (BACKEND FLOW ONLY) */}
           <div className="flex justify-center">
             <a
-              href="https://7c34f9ca259e.ngrok-free.app/api/auth/google/start"
+              href="https://0e5f0dbc955a.ngrok-free.app/api/auth/google/start"
               className="w-full flex justify-center"
             >
               <button
