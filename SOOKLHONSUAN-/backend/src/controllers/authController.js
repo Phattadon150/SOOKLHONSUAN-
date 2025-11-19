@@ -293,4 +293,123 @@ const insert = await pool.query(
   }
 };
 
-module.exports = { register, login, getMe, checkUsername, googleLogin, googleCompleteSignup };
+// ---------------------------------------------
+// FORGOT PASSWORD
+// POST /api/auth/forgot-password
+// ---------------------------------------------
+const crypto = require('crypto');
+
+const forgotPassword = async (req, res) => {
+  try {
+    let { email } = req.body || {};
+    email = (email || '').trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+
+    const result = await pool.query(
+      'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
+
+    if (!result.rows.length) {
+      return res.json({
+        message: 'If this email exists, a reset link has been sent.'
+      });
+    }
+
+    const user = result.rows[0];
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 นาที
+
+    await pool.query(
+      `UPDATE users
+       SET reset_token = $1,
+           reset_token_expires = $2
+       WHERE id = $3`,
+      [token, expires, user.id]
+    );
+
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+
+    console.log('RESET PASSWORD LINK:', resetLink);
+
+    return res.json({
+      message: 'If this email exists, a reset link has been sent.'
+    });
+
+  } catch (err) {
+    console.error('forgotPassword error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
+// ---------------------------------------------
+// RESET PASSWORD
+// POST /api/auth/reset-password
+// ---------------------------------------------
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body || {};
+
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({
+        error: 'token, password, confirmPassword are required'
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 chars' });
+    }
+
+    const find = await pool.query(
+      'SELECT id, reset_token_expires FROM users WHERE reset_token = $1 LIMIT 1',
+      [token]
+    );
+
+    if (!find.rows.length) {
+      return res.status(400).json({ error: 'Invalid token' });
+    }
+
+    const user = find.rows[0];
+
+    if (!user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+      return res.status(400).json({ error: 'Token expired' });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      `UPDATE users
+       SET password = $1,
+           reset_token = NULL,
+           reset_token_expires = NULL
+       WHERE id = $2`,
+      [hashed, user.id]
+    );
+
+    return res.json({ message: 'Password reset successful' });
+
+  } catch (err) {
+    console.error('resetPassword error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { 
+  register, 
+  login, 
+  getMe, 
+  checkUsername, 
+  googleLogin, 
+  googleCompleteSignup,
+  forgotPassword,
+  resetPassword
+};
