@@ -12,7 +12,6 @@ import Calculate from "./pages/Calculate.jsx";
 import ProductDetail from "./pages/ProductDetail.jsx"; 
 import CompleteGoogleSignup from "./pages/CompleteGoogleSignup.jsx"; 
 import ForgotPassword from "./pages/ForgotPassword.jsx";
-// ⭐ 1. Import หน้า ResetPassword เข้ามา (ต้องสร้างไฟล์นี้ก่อนนะ ตามโพสต์ที่แล้ว)
 import ResetPassword from "./pages/ResetPassword.jsx"; 
 
 const ProtectedRoute = ({ children }) => {

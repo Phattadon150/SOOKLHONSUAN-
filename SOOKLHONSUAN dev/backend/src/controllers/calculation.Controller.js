@@ -5,10 +5,9 @@ const { getProvinceAvgYield } = require('../utils/provinceAvg');
 const { getProvinceMonthlyPattern } = require('../utils/monthlyPattern');
 
 // ================== HELPERS ==================
-// (...ฟังก์ชัน ageFactor, careFactor, seasonFactorFromPattern ...โค้ดเดิม...)
 function ageFactor(ageYears) {
   const a = Number(ageYears);
-  let factor = 0.6; // default
+  let factor = 0.6; 
   if (!Number.isFinite(a) || a <= 0)  factor = 0.6;
   else if (a < 3)   factor = 0.8;
   else if (a <= 8)  factor = 1.0;
@@ -16,8 +15,9 @@ function ageFactor(ageYears) {
   else              factor = 0.85;
   return factor;
 }
+
 function careFactor(quality) {
-  let factor = 1.0; // default
+  let factor = 1.0; 
   if (!quality) return factor;
   const q = String(quality).toLowerCase().trim();
   if (['ดีมาก', 'ดี', 'high', 'good', '1'].includes(q)) factor = 1.1;
@@ -33,6 +33,7 @@ function careFactor(quality) {
   }
   return factor;
 }
+
 function seasonFactorFromPattern(pattern, harvest_month) {
   if (!harvest_month) return { factor: 1.0, monthPercent: null };
   const idx = Number(harvest_month) - 1;
@@ -51,27 +52,24 @@ function seasonFactorFromPattern(pattern, harvest_month) {
     monthPercent: monthPct
   };
 }
+
 // ================== CORE: คำนวณผลผลิต ==================
-// ( ...ฟังก์ชัน computeFromProvince ...โค้ดเดิม...)
 async function computeFromProvince({
   crop_type_id, province, area_rai, harvest_month, tree_age_avg, quality
 }) {
-  console.log('[Helper: compute] เริ่มคำนวณจากจังหวัด:', { crop_type_id, province, area_rai, harvest_month, tree_age_avg, quality });
+  // (ตัด Log เพื่อความกระชับ แต่ฟังก์ชันทำงานเหมือนเดิม)
   const avg = await getProvinceAvgYield({ crop_type_id, province });
-  console.log(`[Helper: compute] ค่าเฉลี่ยจังหวัด (${province}): ${avg} กก./ไร่`);
   if (avg == null) return null;
+
   const area = Number(area_rai);
   const safeArea = Number.isFinite(area) && area > 0 ? area : 0;
-  console.log(`[Helper: compute] พื้นที่ (ไร่): ${safeArea}`);
   const fAge = ageFactor(tree_age_avg);
   const fCare = careFactor(quality);
-  console.log(`[Helper: compute] Factors -> Age: ${fAge}, Care: ${fCare}`);
   const effectivePerRai = Number(avg) * fAge * fCare;
   const baseYield = safeArea * effectivePerRai;
-  console.log(`[Helper: compute] ผลผลิตพื้นฐาน (ต่อไร่): ${effectivePerRai.toFixed(2)}, ผลผลิตพื้นฐาน (รวม): ${baseYield.toFixed(2)}`);
+
   if (!harvest_month) {
-    console.log('[Helper: compute] ไม่ระบุเดือน, ใช้ผลผลิตพื้นฐาน');
-    const result = {
+    return {
       estimated: Math.round(baseYield),
       baseline_avg_per_rai: Number(avg),
       effective_yield_per_rai: Number(effectivePerRai.toFixed(2)),
@@ -79,15 +77,12 @@ async function computeFromProvince({
       monthly_percent: null,
       season_factor: 1.0, age_factor: fAge, care_factor: fCare, note: null
     };
-    console.log('[Helper: compute] ผลลัพธ์:', result);
-    return result;
   }
-  console.log('[Helper: compute] ระบุเดือน, กำลังดึง Pattern รายเดือน...');
+
   const pattern = await getProvinceMonthlyPattern({ crop_type_id, province });
   const { factor: fSeason, monthPercent } = seasonFactorFromPattern(pattern, harvest_month);
-  console.log(`[Helper: compute] Factor ฤดูกาล: ${fSeason} (Percent: ${monthPercent})`);
+
   if (fSeason === 0) {
-    console.log('[Helper: compute] นอกฤดูกาล, ผลผลิต = 0');
     return {
       estimated: 0,
       baseline_avg_per_rai: Number(avg),
@@ -97,9 +92,9 @@ async function computeFromProvince({
       note: `Out of season for month ${harvest_month} in province "${province}"`
     };
   }
+
   const estSeasonal = baseYield * fSeason;
-  console.log(`[Helper: compute] ผลผลิตตามฤดูกาล: ${estSeasonal.toFixed(2)}`);
-  const finalResult = {
+  return {
     estimated: Math.round(estSeasonal),
     baseline_avg_per_rai: Number(avg),
     effective_yield_per_rai: Number(effectivePerRai.toFixed(2)),
@@ -107,39 +102,35 @@ async function computeFromProvince({
     monthly_percent: monthPercent,
     season_factor: fSeason, age_factor: fAge, care_factor: fCare, note: null
   };
-  console.log('[Helper: compute] ผลลัพธ์สุดท้าย:', finalResult);
-  return finalResult;
 }
 
 // ===== PREVIEW: คำนวณอย่างเดียว ไม่บันทึก =====
 const previewCalculation = async (req, res) => {
-  console.log('--- [CalcController: previewCalculation] เริ่มต้น ---');
+  console.log('--- [CalcController: previewCalculation] ---');
   try {
-    // ⭐️ (แก้ไข) 1. เปลี่ยนจาก .userId เป็น .id
-    const userId = req.user.id;
-    const body = req.body || {};
-    // ⭐️ (แก้ไข) 1.1 แก้ไข Syntax Error
-    const { farm_id, crop_type_id, location } = body;
-    console.log(`[Calc: preview] UserID: ${userId}, Body:`, body);
+    // 🛡️ SAFE GUARD: รองรับทั้ง id และ userId
+    const userId = req.user?.id || req.user?.userId;
+    
+    if (!userId) return res.status(401).json({ error: 'User ID not found (Unauthorized)' });
 
-    // ⭐️ (แก้ไข) 1.2 แก้ไข Syntax Error
+    const body = req.body || {};
+    const { farm_id, crop_type_id, location } = body;
+
     if (!farm_id || !crop_type_id || !location) {
-      console.warn('[Calc: preview] Validation Failed: ข้อมูลไม่ครบ');
       return res.status(400).json({ error: 'farm_id, crop_type_id และ location (จังหวัด) จำเป็น' });
     }
-    console.log(`[Calc: preview] ตรวจสอบ Farm ID: ${farm_id} ของ User: ${userId}`);
+
     const f = await pool.query('SELECT 1 FROM farms WHERE id=$1 AND user_id=$2', [farm_id, userId]);
     if (!f.rows.length) {
-      console.warn('[Calc: preview] Error: ไม่พบ Farm');
       return res.status(404).json({ error: 'Farm not found' });
     }
+
     let est = body.estimated_yield;
     let resultPayload = {};
+
     if (est == null) {
-      console.log('[Calc: preview] estimated_yield = null, เริ่มคำนวณ...');
       const r = await computeFromProvince({ ...body, province: location });
       if (!r) {
-        console.warn(`[Calc: preview] Error: ไม่มีข้อมูลผลผลิตเฉลี่ยของจังหวัด "${location}"`);
         return res.status(404).json({ error: `No average yield for province "${location}"` });
       }
       est = r.estimated;
@@ -153,22 +144,14 @@ const previewCalculation = async (req, res) => {
         care_factor: r.care_factor,
         note: r.note
       };
-      console.log('[Calc: preview] คำนวณสำเร็จ, estimated_yield =', est);
-    } else {
-      console.log(`[Calc: preview] ใช้ estimated_yield ที่ส่งมา: ${est}`);
     }
-    const response = {
+
+    return res.json({
       preview: true,
       input: body,
-      result: {
-        estimated_yield: est,
-        ...resultPayload
-      }
-    };
-    console.log('[Calc: preview] ส่งผลลัพธ์ Preview สำเร็จ');
-    return res.json(response);
+      result: { estimated_yield: est, ...resultPayload }
+    });
   } catch (e) {
-    console.error('--- [CalcController: previewCalculation] เกิดข้อผิดพลาด ---');
     console.error(e);
     res.status(500).json({ error: e.message });
   }
@@ -176,74 +159,71 @@ const previewCalculation = async (req, res) => {
 
 // ===== CREATE: บันทึกจริง =====
 const createCalculation = async (req, res) => {
-  console.log('--- [CalcController: createCalculation] เริ่มต้น ---');
+  console.log('--- [CalcController: createCalculation] ---');
   try {
-    // ⭐️ (แก้ไข) 2. เปลี่ยนจาก .userId เป็น .id
-    const userId = req.user.id;
-    // ⭐️ (แก้ไข) 2.1 แก้ไข Syntax Error
+    // 🛡️ SAFE GUARD
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'User ID not found' });
+
     const {
       farm_id, crop_type_id, location, area_rai,
       tree_age_avg, quality, harvest_month,
       calc_date, estimated_yield, actual_yield
     } = req.body || {};
-    console.log(`[Calc: create] UserID: ${userId}, Body:`, req.body);
 
-    // ⭐️ (แก้ไข) 2.2 แก้ไข Syntax Error
     if (!farm_id || !crop_type_id || !location) {
-      console.warn('[Calc: create] Validation Failed: ข้อมูลไม่ครบ');
-      return res.status(400).json({ error: 'farm_id, crop_type_id และ location (จังหวัด) จำเป็น' });
+      return res.status(400).json({ error: 'farm_id, crop_type_id และ location จำเป็น' });
     }
-    console.log(`[Calc: create] ตรวจสอบ Farm ID: ${farm_id} ของ User: ${userId}`);
+
     const f = await pool.query('SELECT 1 FROM farms WHERE id=$1 AND user_id=$2', [farm_id, userId]);
     if (!f.rows.length) {
-      console.warn('[Calc: create] Error: ไม่พบ Farm');
       return res.status(404).json({ error: 'Farm not found' });
     }
+
     let est = estimated_yield;
     if (est == null) {
-      console.log('[Calc: create] estimated_yield = null, เริ่มคำนวณ...');
       const r = await computeFromProvince({
         crop_type_id, province: location, area_rai, harvest_month, tree_age_avg, quality
       });
       if (!r) {
-        console.warn(`[Calc: create] Error: ไม่มีข้อมูลผลผลิตเฉลี่ยของจังหวัด "${location}"`);
         return res.status(404).json({ error: `No average yield for province "${location}"` });
       }
       est = r.estimated;
-      console.log('[Calc: create] คำนวณสำเร็จ, estimated_yield =', est);
-    } else {
-      console.log(`[Calc: create] ใช้ estimated_yield ที่ส่งมา: ${est}`);
     }
+
     const safeActualYield = (typeof actual_yield === 'number') ? actual_yield : null;
-    console.log(`[Calc: create] กำลังบันทึก Calculation (Actual: ${safeActualYield})...`);
+    
     const { rows } = await pool.query(
       `INSERT INTO calculations
         (farm_id, crop_id, crop_type_id, calc_date, location, area_rai,
          estimated_yield, actual_yield, condition, harvest_month, tree_age_avg, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, $10, $11, NOW())
-       RETURNING id, farm_id, crop_type_id, calc_date, location, area_rai,
-                 estimated_yield, actual_yield, condition, harvest_month, tree_age_avg, created_at`,
+       RETURNING *`,
       [
         farm_id, null, crop_type_id, calc_date || null, location, area_rai || null,
         est, safeActualYield, quality || null, harvest_month || null, tree_age_avg || null
       ]
     );
-    console.log('[Calc: create] บันทึก Calculation สำเร็จ:', rows[0]);
+
     return res.status(201).json(rows[0]);
   } catch (e) {
-    console.error('--- [CalcController: createCalculation] เกิดข้อผิดพลาด ---');
     console.error(e);
     res.status(500).json({ error: e.message });
   }
 };
 
-// ⭐️ ===== GET ALL: ดึงผลการคำนวณทั้งหมดของ User (สำหรับ Dashboard/History) =====
+// ===== GET ALL =====
 const getCalculationsByUser = async (req, res) => {
-  console.log('--- [CalcController: getCalculationsByUser] เริ่มต้น ---');
+  console.log('--- [CalcController: getCalculationsByUser] ---');
   try {
-    // ⭐️ (แก้ไข) 3. เปลี่ยนจาก .userId เป็น .id
-    const userId = req.user.id;
-    console.log(`[Calc: getAll] กำลังดึง Calculations ทั้งหมดของ User ID: ${userId}`);
+    // 🛡️ SAFE GUARD: หัวใจสำคัญของการแก้ปัญหานี้
+    const userId = req.user?.id || req.user?.userId;
+    
+    console.log(`[Calc: getAll] UserID from token: ${userId}`);
+
+    if (!userId) {
+        return res.status(401).json({ error: 'User ID not found in token' });
+    }
 
     const { rows } = await pool.query(
       `SELECT 
@@ -259,29 +239,25 @@ const getCalculationsByUser = async (req, res) => {
       [userId]
     );
 
-    console.log(`[Calc: getAll] พบ ${rows.length} รายการ`);
+    console.log(`[Calc: getAll] Found: ${rows.length} items`);
     res.json(rows);
 
   } catch (e) {
-    console.error('--- [CalcController: getCalculationsByUser] เกิดข้อผิดพลาด ---');
     console.error(e);
     res.status(500).json({ error: e.message });
   }
 };
 
-// ===== DELETE: ลบรายการ =====
+// ===== DELETE =====
 const deleteCalculation = async (req, res) => {
-  console.log('--- [CalcController: deleteCalculation] เริ่มต้น ---');
   try {
-    // ⭐️ (แก้ไข) 4. เปลี่ยนจาก .userId เป็น .id
-    const userId = req.user.id;
+    // 🛡️ SAFE GUARD
+    const userId = req.user?.id || req.user?.userId;
     const { id } = req.params;
-    console.log(`[Calc: delete] UserID: ${userId}, CalcID: ${id}`);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const calcId = parseInt(id, 10);
-    if (isNaN(calcId) || calcId <= 0) {
-      return res.status(400).json({ error: 'Invalid Calculation ID format' });
-    }
+    if (isNaN(calcId)) return res.status(400).json({ error: 'Invalid ID' });
 
     const result = await pool.query(
       `DELETE FROM calculations c
@@ -293,77 +269,44 @@ const deleteCalculation = async (req, res) => {
     );
     
     if (result.rowCount === 0) {
-      console.warn(`[Calc: delete] Error: ไม่พบ Calc ID: ${calcId} ของ User: ${userId}`);
-      return res.status(404).json({ error: 'Calculation not found or not yours' });
+      return res.status(404).json({ error: 'Item not found' });
     }
-
-    console.log(`[Calc: delete] ลบ Calculation ID: ${calcId} สำเร็จ`);
-    res.json({ message: 'Calculation deleted successfully' });
-
+    res.json({ message: 'Deleted successfully' });
   } catch (err) {
-    console.error('--- [CalcController: deleteCalculation] เกิดข้อผิดพลาด ---');
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ===== UPDATE: อัปเดตรายการ (บันทึกผลจริง) =====
+// ===== UPDATE =====
 const updateCalculation = async (req, res) => {
-  console.log('--- [CalcController: updateCalculation] เริ่มต้น ---');
   try {
-    // ⭐️ (แก้ไข) 5. เปลี่ยนจาก .userId เป็น .id
-    const userId = req.user.id;
+    // 🛡️ SAFE GUARD
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
     const { actual_yield, calc_date } = req.body; 
-
-    console.log(`[Calc: update] UserID: ${userId}, CalcID: ${id}, Body:`, req.body);
-
     const calcId = parseInt(id, 10);
-    if (isNaN(calcId) || calcId <= 0) {
-      return res.status(400).json({ error: 'Invalid Calculation ID format' });
-    }
 
     const safeActualYield = Number(actual_yield);
-    if (actual_yield == null || !Number.isFinite(safeActualYield) || safeActualYield < 0) {
-      return res.status(400).json({ error: 'actual_yield (ผลผลิตจริง) is required and must be a number' });
-    }
-    
     const safeCalcDate = calc_date ? new Date(calc_date) : new Date();
-    if (isNaN(safeCalcDate.getTime())) {
-       return res.status(400).json({ error: 'Invalid calc_date format' });
-    }
-
-    console.log(`[Calc: update] Updating CalcID: ${calcId} with Actual: ${safeActualYield}, Date: ${safeCalcDate.toISOString()}`);
 
     const { rows } = await pool.query(
       `UPDATE calculations c
-       SET 
-         actual_yield = $1,
-         calc_date = $2 
+       SET actual_yield = $1, calc_date = $2 
        FROM farms f
-       WHERE c.id = $3
-         AND c.farm_id = f.id
-         AND f.user_id = $4
-       RETURNING c.id, c.farm_id, c.location, c.estimated_yield, c.actual_yield, c.calc_date`,
+       WHERE c.id = $3 AND c.farm_id = f.id AND f.user_id = $4
+       RETURNING c.*`,
       [safeActualYield, safeCalcDate, calcId, userId]
     );
 
-    if (rows.length === 0) {
-      console.warn(`[Calc: update] Error: ไม่พบ Calc ID: ${calcId} ของ User: ${userId}`);
-      return res.status(404).json({ error: 'Calculation not found or not yours' });
-    }
-
-    console.log('[Calc: update] อัปเดตสำเร็จ:', rows[0]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
-
   } catch (err) {
-    console.error('--- [CalcController: updateCalculation] เกิดข้อผิดพลาด ---');
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ⭐️ (แก้ไข) 6. แก้ไข module.exports (โค้ดเดิมของคุณถูกต้องแล้ว)
 module.exports = { 
   previewCalculation, 
   createCalculation,
