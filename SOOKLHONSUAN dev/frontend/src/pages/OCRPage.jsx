@@ -8,12 +8,14 @@ export default function OCRPage() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [ocrResult, setOcrResult] = useState("ผลลัพธ์ข้อความที่สแกนจะปรากฏที่นี่...");
   const [isLoading, setIsLoading] = useState(false);
-  const [cameraOn, setCameraOn] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [cameraOn, setCameraOn] = useState(false);
 
-  // 🔥 START CAMERA (เวอร์ชันที่ใช้ได้จริง)
+  // =============================
+  // START CAMERA
+  // =============================
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -21,15 +23,9 @@ export default function OCRPage() {
         audio: false,
       });
 
-      if (!videoRef.current) {
-        console.log("VIDEO ยังไม่พร้อม");
-        return;
-      }
-
-      videoRef.current.srcObject = stream;
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current.play();
-      };
+      const video = videoRef.current;
+      video.srcObject = stream;
+      video.onloadedmetadata = () => video.play();
 
       setCameraOn(true);
     } catch (err) {
@@ -37,14 +33,15 @@ export default function OCRPage() {
     }
   };
 
-  // 🔥 CAPTURE PHOTO
+  // =============================
+  // CAPTURE PHOTO
+  // =============================
   const capturePhoto = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
     if (!video) return alert("กล้องยังไม่พร้อม");
 
-    // รอเฟรมแรก (มือถือจำเป็นมาก)
     await new Promise((res) => requestAnimationFrame(res));
 
     canvas.width = video.videoWidth || 1280;
@@ -57,32 +54,37 @@ export default function OCRPage() {
       canvas.toBlob(resolve, "image/jpeg", 0.95)
     );
 
-    if (!blob) return alert("ถ่ายภาพไม่สำเร็จ");
+    if (!blob) return alert("ถ่ายรูปไม่สำเร็จ");
 
     const file = new File([blob], "camera.jpg", { type: "image/jpeg" });
-
     setSelectedFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
 
-    // ปิด stream
+    // Stop camera after capture
+    setCameraOn(false);
     const stream = video.srcObject;
     if (stream) stream.getTracks().forEach((t) => t.stop());
-    setCameraOn(false);
   };
 
-  // 🔥 RUN OCR
+  // =============================
+  // PROCESS OCR
+  // =============================
   const runOCR = async () => {
     if (!selectedFile) return alert("กรุณาเลือกรูปหรือถ่ายรูปก่อน");
 
     setIsLoading(true);
-
     const res = await uploadImage(selectedFile);
-    setOcrResult(res.markdown || res.text || JSON.stringify(res, null, 2));
+
+    setOcrResult(
+      res.markdown || res.text || JSON.stringify(res, null, 2)
+    );
 
     setIsLoading(false);
   };
 
-  // 📤 Process File from gallery
+  // =============================
+  // FILE UPLOAD
+  // =============================
   const processFile = (file) => {
     if (file && file.type.startsWith("image/")) {
       setSelectedFile(file);
@@ -101,10 +103,11 @@ export default function OCRPage() {
         </h1>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* LEFT */}
+          
+          {/* LEFT SIDE */}
           <div className="lg:w-2/5 space-y-5">
 
-            {/* File Upload */}
+            {/* Upload */}
             <input
               type="file"
               accept="image/*"
@@ -112,34 +115,36 @@ export default function OCRPage() {
               className="border p-3 rounded-xl w-full cursor-pointer"
             />
 
-            {/* Camera Button */}
+            {/* Button to open camera */}
             {!cameraOn && (
               <button
                 onClick={startCamera}
                 className="w-full bg-green-700 text-white py-3 rounded-xl font-bold hover:bg-green-800"
               >
-                📸 เปิดกล้อง
+                📸 เปิดกล้องเพื่อถ่ายรูป
               </button>
             )}
 
-            {/* Video ALWAYS rendered */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`rounded-xl w-full bg-black ${cameraOn ? "" : "hidden"}`}
-            />
-
-            <canvas ref={canvasRef} className="hidden"></canvas>
-
+            {/* Camera Preview */}
             {cameraOn && (
-              <button
-                onClick={capturePhoto}
-                className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600"
-              >
-                ✔ ถ่ายรูป & ใช้ภาพนี้
-              </button>
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="rounded-xl w-full bg-black"
+                />
+
+                <canvas ref={canvasRef} className="hidden"></canvas>
+
+                <button
+                  onClick={capturePhoto}
+                  className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600"
+                >
+                  ✔ ถ่ายรูป & ใช้ภาพนี้
+                </button>
+              </>
             )}
 
             {/* Image Preview */}
@@ -161,15 +166,17 @@ export default function OCRPage() {
             </button>
           </div>
 
-          {/* RIGHT */}
+          {/* RIGHT SIDE */}
           <div className="lg:w-3/5">
             <h2 className="text-xl font-bold text-green-900 mb-2">ผลลัพธ์</h2>
+
             <textarea
               value={ocrResult}
               readOnly
               className="w-full h-[420px] border p-4 rounded-xl bg-gray-50 shadow-inner"
-            ></textarea>
+            />
           </div>
+
         </div>
       </div>
 

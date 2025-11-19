@@ -28,9 +28,9 @@ const allowedOrigins = [
 ];
 
 app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // mobile camera / curl
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // mobile camera / curl
 
       const isAllowed = allowedOrigins.some((o) =>
         origin.includes(o.replace("*", ""))
@@ -54,16 +54,14 @@ const farmRoutes = require('./src/routes/farm');
 const cropTypeRoutes = require('./src/routes/cropTypes');
 const userRoutes = require('./src/routes/user');
 const calculationRoutes = require('./src/routes/calculations');
-const ocrRoutes = require('./src/routes/ocr'); 
+const ocrRoutes = require('./src/routes/ocr'); // 💡 ไฟล์สำหรับ OCR route
+const extractRoutes = require("./src/routes/extract");
 const marketPriceRoutes = require('./src/routes/marketPrices'); // ✅ 2. เพิ่ม Route ราคากลาง
-
-// ======================
-// Route Setup
-// ======================
-
 // Public routes
 app.use('/api/auth', authRoutes);
 app.use('/api/crop-types', cropTypeRoutes);
+app.use("/api", ocrRoutes);
+app.use("/api", extractRoutes);   // ⭐ เพิ่มใหม่
 
 // Protected routes (ต้อง Login)
 app.use('/api/farms', auth, farmRoutes);
