@@ -21,28 +21,10 @@ app.use((req, res, next) => {
 // ======================
 // CORS (เวอร์ชันรองรับ NGROK + มือถือ)
 // ======================
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  ".ngrok-free.app",        // อนุญาตทุก ngrok subdomain
-];
-
 app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // mobile camera / curl
-
-      const isAllowed = allowedOrigins.some((o) =>
-        origin.includes(o.replace("*", ""))
-      );
-
-      if (isAllowed) {
-        return callback(null, true);
-      } else {
-        console.log("❌ CORS BLOCKED:", origin);
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
+  cors({
+    origin: true,        // ให้ reflect origin กลับไป (อนุญาตทั้งหมดใน dev)
+    credentials: true,   // เผื่อมี cookie / auth อื่น ๆ
   })
 );
 
