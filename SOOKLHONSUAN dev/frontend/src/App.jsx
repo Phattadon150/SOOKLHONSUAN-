@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-// ⭐️ แก้ไข: เพิ่ม .jsx ต่อท้าย path
 import OCRPage from "./pages/OCRPage.jsx";
 import Landing from "./pages/Landing.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -12,17 +11,16 @@ import ValueSummary from "./pages/ValueSummary.jsx";
 import Calculate from "./pages/Calculate.jsx";
 import ProductDetail from "./pages/ProductDetail.jsx"; 
 import CompleteGoogleSignup from "./pages/CompleteGoogleSignup.jsx"; 
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+// ⭐ 1. Import หน้า ResetPassword เข้ามา (ต้องสร้างไฟล์นี้ก่อนนะ ตามโพสต์ที่แล้ว)
+import ResetPassword from "./pages/ResetPassword.jsx"; 
 
-
-// ⭐️ Component "ด่านตรวจ" (ProtectedRoute)
-// (เก็บไว้ใน App.jsx หรือย้ายไปไฟล์แยกก็ได้ครับ)
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   if (!token) {
-    // ถ้าไม่มี Token, เด้งไปหน้า Login
     return <Navigate to="/login" replace />;
   }
-  return children; // ถ้ามี Token, แสดงหน้าที่ร้องขอ
+  return children;
 };
 
 export default function App() {
@@ -33,30 +31,22 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       
-      {/* ⭐️ 2. (ใหม่) เพิ่ม Route สำหรับหน้ายืนยัน Google (เป็น Public) */}
+      {/* Route สำหรับหน้ากรอกอีเมล (กดจากหน้า Login จะมาหน้านี้) */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      
+      {/* ⭐ 2. เพิ่ม Route สำหรับหน้าตั้งรหัสผ่านใหม่ (กดจากอีเมลจะมาหน้านี้) */}
+      <Route path="/reset-password" element={<ResetPassword />} /> 
+      
       <Route 
         path="/complete-google-signup" 
         element={<CompleteGoogleSignup />} 
       />
 
-      {/* ⭐️ Routes ที่ต้อง Login (หุ้มด้วย ProtectedRoute) */}
+      {/* Routes ที่ต้อง Login */}
       <Route 
         path="/dashboard" 
         element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
       />
-      <Route path="/" element={<Landing />} />
-  <Route path="/login" element={<Login />} />
-  <Route path="/register" element={<Register />} />
-
-  {/* ⭐ เปิดหน้า OCR แบบไม่ต้อง login */}
-  <Route path="/ocr" element={<OCRPage />} />
-
-  {/* Routes ที่ต้อง Login */}
-  <Route 
-    path="/dashboard" 
-    element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
-  />
-
       <Route 
         path="/farmform" 
         element={<ProtectedRoute><FarmForm /></ProtectedRoute>} 
@@ -73,8 +63,10 @@ export default function App() {
         path="/product/:crop" 
         element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} 
       />
-
-      {/* Routes ที่ต้อง Login และมี farmId */}
+      <Route 
+        path="/farm/:farmId/ocr" 
+        element={<ProtectedRoute><OCRPage /></ProtectedRoute>} 
+      />
       <Route 
         path="/farm/:farmId/calculate" 
         element={<ProtectedRoute><Calculate /></ProtectedRoute>} 
@@ -84,9 +76,7 @@ export default function App() {
         element={<ProtectedRoute><Summary /></ProtectedRoute>} 
       />
 
-      {/* ถ้าเข้า Path มั่ว, กลับไปหน้าแรก */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    
   );
 }

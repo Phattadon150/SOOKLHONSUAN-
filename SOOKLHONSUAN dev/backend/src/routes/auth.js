@@ -1,21 +1,22 @@
 // backend/src/routes/auth.js
-// (ใช้ไฟล์ auth_Google.js)
 
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 
+// Route พื้นฐาน
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 
+// Route สำหรับ Google Login
 router.post('/google', authController.googleLogin);
 router.post('/google/complete', authController.googleCompleteSignup);
 
+// Route เช็คชื่อซ้ำ และ ดึงข้อมูลส่วนตัว
 router.get('/check-username', authController.checkUsername);
+router.get('/me', authController.getMe);
 
-// ⭐️ เพิ่ม: Route นี้จำเป็นสำหรับ /api/users/me
-router.get('/me', authController.getMe); 
-// หมายเหตุ: ถ้าคุณมี /api/users/me อยู่แล้ว ก็ไม่จำเป็นต้องเพิ่มบรรทัดนี้
-// แต่จากไฟล์ app.js ดูเหมือนคุณจะยังไม่มี route /me ครับ
+// ⭐️ Route ใหม่สำหรับลืมรหัสผ่าน
+router.post('/forgot-password', authController.forgotPassword);
 
 module.exports = router;

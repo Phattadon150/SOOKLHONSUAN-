@@ -1,20 +1,35 @@
-// Navbar.jsx (อัปเดต: ใส่ UserMenu แทน Logout)
+// Navbar.jsx (Fixed Logout Issue)
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import UserMenu from "./UserMenu";
-import { Link, useNavigate, NavLink } from "react-router-dom"; 
+import { Link, useNavigate, NavLink, useLocation } from "react-router-dom"; 
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "../assets/logosook.png";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation(); // ⭐ 1. เพิ่ม: ตัวดักจับการเปลี่ยนหน้า
 
-  const isLoggedIn = !!localStorage.getItem("token");
+  // ⭐ 2. แก้ไข: เปลี่ยน isLoggedIn เป็น State เพื่อให้ React สั่งเปลี่ยนหน้าจอได้
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
+
+  // ⭐ 3. Effect: ทุกครั้งที่ URL เปลี่ยน (เช่น กด Logout แล้วเด้งไปหน้า Login) ให้เช็ค Token ใหม่ทันที
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token); // อัปเดตสถานะจริง
+  }, [location]); // ทำงานทุกครั้งที่เปลี่ยนหน้า
 
   const handleLogout = () => {
-    localStorage.clear();
+    // ลบ Token
+    localStorage.removeItem("token"); 
+    localStorage.clear(); // เผื่อมี key อื่นๆ
+    
+    // บังคับอัปเดต State ทันที เพื่อให้เมนูเปลี่ยนเดี๋ยวนั้นเลย
+    setIsLoggedIn(false);
     setMenuOpen(false);
+    
+    // ดีดกลับไปหน้า Login
     navigate("/login");
   };
 
@@ -49,7 +64,7 @@ export default function Navbar() {
         {/* Hamburger button */}
         <motion.button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="text-green-800 absolute left-4 top-1/2 -translate-y-1/2"
+          className="text-green-800 absolute left-4 top-1/2 -translate-y-1/2 z-50"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
@@ -150,7 +165,7 @@ export default function Navbar() {
                   </>
                 )}
               </NavLink>
-
+              
               <NavLink to="/profilePage" className="relative px-3 py-1.5 rounded-lg">
                 {({ isActive }) => (
                   <>
@@ -166,9 +181,10 @@ export default function Navbar() {
                 )}
               </NavLink>
 
-              {/* ⭐ USER MENU ปุ่ม Avatar + Dropdown (แทน Logout เดิม) */}
+              {/* USER MENU */}
               <div className="ml-4">
-                <UserMenu user={{ photoURL: null }} />
+                {/* ส่ง onLogout ไปให้ด้วย เผื่อ UserMenu รองรับ */}
+                <UserMenu user={{ photoURL: null }} onLogout={handleLogout} />
               </div>
             </>
           ) : (
@@ -208,13 +224,14 @@ export default function Navbar() {
                 <NavLink to="/valuesummary" onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? mobileActiveStyle : mobileInactiveStyle)}>
                   มูลค่าสวน
                 </NavLink>
+                
                 <NavLink to="/profilePage" onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? mobileActiveStyle : mobileInactiveStyle)}>
                   โปรไฟล์
                 </NavLink>
 
                 <motion.button
                   onClick={handleLogout}
-                  className="w-full text-center bg-red-600 text-white py-2 rounded-lg font-semibold shadow hover:bg-red-700"
+                  className="w-full text-center bg-red-600 text-white py-2 rounded-lg font-semibold shadow hover:bg-red-700 cursor-pointer"
                   whileTap={{ scale: 0.98 }}
                 >
                   Logout
