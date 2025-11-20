@@ -1,5 +1,9 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 // frontend/src/pages/Login.jsx
+=======
+// frontend/src/Login.jsx (ฉบับอัปเดต Google)
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
 =======
 // frontend/src/Login.jsx (ฉบับอัปเดต Google)
 >>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
@@ -10,6 +14,10 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Modal from "../components/Modal";
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+import { GoogleLogin } from '@react-oauth/google'; // ⭐️ 1. Import GoogleLogin
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
 =======
 import { GoogleLogin } from '@react-oauth/google'; // ⭐️ 1. Import GoogleLogin
 >>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
@@ -39,6 +47,7 @@ export default function Login() {
     setModal({ isOpen: false, title: "", message: "", type: "info" });
   };
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   const handleLoginSuccess = (token, user) => {
     localStorage.setItem("token", token);
@@ -81,6 +90,28 @@ export default function Login() {
 =======
       // ⭐️ 2. (ปรับปรุง) สร้างฟังก์ชันช่วย เพื่อไม่ให้โค้ดซ้ำ
 >>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
+=======
+  // --- (ฟังก์ชัน handleLogin เดิม) ---
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch("http://localhost:4000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setModal({ 
+          isOpen: true, 
+          title: "เข้าสู่ระบบผิดพลาด", 
+          message: data.error || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+          type: 'error'
+        });
+        return;
+      }
+      // ⭐️ 2. (ปรับปรุง) สร้างฟังก์ชันช่วย เพื่อไม่ให้โค้ดซ้ำ
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
       handleLoginSuccess(data.token, data.user);
       
     } catch (error) {
@@ -89,8 +120,13 @@ export default function Login() {
         isOpen: true,
         title: "เกิดข้อผิดพลาด",
 <<<<<<< HEAD
+<<<<<<< HEAD
         message: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้",
         type: "error",
+=======
+        message: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: " + error.message,
+        type: 'error'
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
 =======
         message: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: " + error.message,
         type: 'error'
@@ -100,11 +136,14 @@ export default function Login() {
   };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Navbar />
       <Modal
 =======
+=======
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
   // ⭐️ 3. (ใหม่) ฟังก์ชันสำหรับจัดการเมื่อ Login สำเร็จ (ใช้ร่วมกัน)
   const handleLoginSuccess = (token, user) => {
     localStorage.setItem("token", token);
@@ -230,6 +269,7 @@ export default function Login() {
           </div>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
           {/* ⭐ NEW GOOGLE LOGIN BUTTON (BACKEND FLOW ONLY) */}
           <div className="flex justify-center">
             <a
@@ -249,6 +289,8 @@ export default function Login() {
               </button>
             </a>
 =======
+=======
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
           {/* ⭐️ 8. (ใหม่) ปุ่ม Google Login */}
           <div className="flex justify-center">
             <GoogleLogin

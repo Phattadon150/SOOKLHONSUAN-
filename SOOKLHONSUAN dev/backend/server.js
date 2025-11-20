@@ -44,8 +44,13 @@ app.get(/\/(.*)/, (req, res) => {
 // START SERVER
 // ===============================
 <<<<<<< HEAD
+<<<<<<< HEAD
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
+=======
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
 =======
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
