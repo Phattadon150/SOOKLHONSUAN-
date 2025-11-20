@@ -54,12 +54,6 @@ app.use('/api/market-prices', auth, marketPriceRoutes); // ✅ 3. เปิด�
 // OCR (ไม่ต้อง login ตามโค้ดเดิมของคุณ)
 app.use('/api', ocrRoutes); 
 
-
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-  next();
-});
 // ======================
 // Cron Job (ตั้งเวลาดึงราคาอัตโนมัติ)
 // ======================

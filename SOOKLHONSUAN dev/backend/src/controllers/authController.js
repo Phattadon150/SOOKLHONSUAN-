@@ -1,5 +1,3 @@
-// controllers/authController.js
-
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -76,9 +74,7 @@ const login = async (req, res) => {
       return res.status(500).json({ error: 'JWT secret not configured' });
     }
 
-    // สร้าง Token โดยใช้ key 'id'
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({
       token,
       user: {
@@ -95,28 +91,17 @@ const login = async (req, res) => {
   }
 };
 
-// --- Get Me (แก้ไขแล้ว) ---
+// --- Get Me ---
 const getMe = async (req, res) => {
   try {
-    // ⭐️ แก้ไข: รองรับทั้ง .id (จากการ sign ปกติ) และ .userId (เผื่อกรณีอื่น)
-    // หาก req.user ไม่มีค่าเลย ให้ถือว่าเป็น undefined
-    const userPayload = req.user || {};
-    const userId = userPayload.id || userPayload.userId;
-
-    if (!userId) {
-        return res.status(401).json({ error: 'User ID not found in token' });
-    }
-
+    const userId = req.user.userId;
     const { rows } = await pool.query(
       'SELECT id, firstname, lastname, email, username, plan_type, created_at FROM users WHERE id = $1',
       [userId]
     );
-    
     if (!rows.length) return res.status(404).json({ error: 'User not found' });
-    
     res.json(rows[0]);
   } catch (err) {
-    console.error('getMe error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -171,7 +156,7 @@ const googleLogin = async (req, res) => {
         user = updated.rows[0];
       } catch (_) {} 
 
-      const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
       return res.json({
         token,
         user: {
@@ -236,7 +221,7 @@ const googleCompleteSignup = async (req, res) => {
     );
 
     const user = insert.rows[0];
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     return res.status(201).json({ token, user });
   } catch (err) {
     console.error('googleCompleteSignup error:', err);
@@ -264,7 +249,7 @@ const forgotPassword = async (req, res) => {
     const token = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 นาที
 
-    // อัปเดตลง DB
+    // อัปเดตลง DB (อย่าลืมรันคำสั่ง SQL เพิ่ม column ก่อนนะ)
     await pool.query(
       `UPDATE users
        SET reset_token = $1,

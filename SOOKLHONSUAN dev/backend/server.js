@@ -1,9 +1,8 @@
-// server.js
+// server.js (แก้ไข COOP Policy)
 
 require('dotenv').config();
 const path = require("path");
 const express = require("express");
-const cors = require("cors"); // แนะนำให้เพิ่ม cors หากยังไม่มี
 
 const app = require("./app"); 
 
@@ -13,13 +12,12 @@ const PORT = process.env.PORT || 4000;
 const frontendBuildPath = path.join(__dirname, "frontend", "vite-project", "dist"); 
 
 // ===============================
-// 🛡️ MIDDLEWARE: แก้ไข Security Headers
+// 🛡️ MIDDLEWARE: แก้ไข Cross-Origin-Opener-Policy (COOP)
 // ===============================
+// การตั้งค่านี้จะอนุญาตให้ Pop-up/Iframe ที่ถูกเปิดโดยหน้านี้ 
+// สามารถใช้ window.postMessage() สื่อสารกลับมาได้โดยไม่ถูกบล็อก
 app.use((req, res, next) => {
-    // อนุญาตให้หน้าเว็บสื่อสารกับ Popup ได้ทุกกรณี (แก้ปัญหา postMessage blocked)
-    res.set('Cross-Origin-Opener-Policy', 'unsafe-none');
-    // ปิดการตรวจสอบ Embedder Policy หรือตั้งเป็น unsafe-none
-    res.set('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     next();
 });
 
@@ -34,16 +32,22 @@ if (require('fs').existsSync(frontendBuildPath)) {
     console.warn("⚠️ Frontend build path not found! Check your Vite build setup.");
 }
 
-// React Router Fallback
+// React Router Fallback (รองรับทุกหน้า SPA)
+// 💡 แก้ไข: ใช้ Regular Expression (/.* /) แทน '*' หรือ '/*' เพื่อเลี่ยง PathError
 app.get(/\/(.*)/, (req, res) => {
-    res.set('Cross-Origin-Opener-Policy', 'unsafe-none');
-    res.set('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    // ต้องตั้งค่า COOP Header ซ้ำในส่วนนี้ด้วย เพื่อให้แน่ใจว่า index.html ได้รับ Header นี้
+    res.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.sendFile(path.join(frontendBuildPath, "index.html"));
 });
 
 // ===============================
 // START SERVER
 // ===============================
+<<<<<<< HEAD
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
+=======
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+>>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
 });
