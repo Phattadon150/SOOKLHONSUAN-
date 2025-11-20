@@ -53,6 +53,5 @@ app.listen(PORT, () => {
 >>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
 =======
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
->>>>>>> parent of 95b95a3 (แก้ได้ละ GG)
+  console.log(`Server running on port ${PORT}`);
 });
